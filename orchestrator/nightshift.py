@@ -28,9 +28,10 @@ import yaml
 
 import gates
 import plan
+import runs
 
-APP = Path("/app")
-DATA = Path("/data")
+APP = Path(__file__).resolve().parent
+DATA = Path(os.environ.get("NS_DATA_DIR", "/data"))
 PLAN = DATA / "plan"
 STATE_DIR = DATA / "state"
 LOGS = DATA / "logs"
@@ -97,10 +98,24 @@ def _default_state() -> dict:
         "last_housekeeping": None,
         "limit_until": None,
         "other_error_streak": 0,
+        # Consecutive planner runs that validated and applied nothing: the
+        # charter's own way of saying it has run out of work.
+        "idle_planner_streak": 0,
+        "finish_requested": False,
     }
 
 
-def state_load() -> dict:
+# state.json has two writers - the main loop and the command listener - and used
+# to be written whole from whichever dict the thread happened to be holding. A
+# command that arrived while the loop was mid-iteration therefore wrote back the
+# loop's state as it had been seconds earlier: a `finish` landing during the ntfy
+# poll silently un-armed a charter the loop had just armed. Each writer now merges
+# against what is actually on disk, keeping only the fields it changed itself.
+_STATE_LOCK = threading.RLock()
+_SEEN = threading.local()
+
+
+def _read_state_file() -> dict:
     if not STATE_FILE.exists():
         return _default_state()
     try:
@@ -110,8 +125,32 @@ def state_load() -> dict:
         return _default_state()
 
 
+def state_load() -> dict:
+    with _STATE_LOCK:
+        data = _read_state_file()
+    _SEEN.snapshot = dict(data)          # what this thread was handed
+    return data
+
+
 def state_save(state: dict) -> None:
-    write_atomic(STATE_FILE, json.dumps(state, indent=2, sort_keys=True) + "\n")
+    """Write this thread's changes without undoing another thread's.
+
+    Three-way merge: a key this thread did not touch takes the value on disk, so
+    a listener saving `paused` cannot revive a `current_task` the loop has since
+    cleared, and the loop cannot un-pause itself by saving a stale snapshot.
+    """
+    with _STATE_LOCK:
+        seen = getattr(_SEEN, "snapshot", None)
+        merged = dict(state)
+        if seen is not None:
+            disk = _read_state_file()
+            for key, value in disk.items():
+                unchanged_here = key in seen and state.get(key) == seen.get(key)
+                if (unchanged_here or key not in state) and value != state.get(key):
+                    merged[key] = value
+        write_atomic(STATE_FILE, json.dumps(merged, indent=2, sort_keys=True) + "\n")
+        _SEEN.snapshot = dict(merged)
+        state.update(merged)             # the caller's dict must not go stale
 
 
 def heartbeat() -> None:
@@ -279,9 +318,34 @@ def ensure_jail_network() -> None:
            timeout=60)
 
 
+def prepare_proxy_logs() -> None:
+    """Own squid's log directory before the dind daemon invents it.
+
+    squid runs as its own unprivileged user and dies on start with "Cannot open
+    /var/log/squid/access.log for writing" unless this bind source exists and is
+    writable. Left to itself the daemon creates it root-owned, squid crash-loops,
+    and because the proxy is the jail's only route out the visible symptom is
+    agents that cannot reach the API at all - with nothing in the orchestrator's
+    own log to say why.
+    """
+    proxy_logs = LOGS / "proxy"
+    try:
+        if proxy_logs.exists() and not os.access(proxy_logs, os.W_OK):
+            shutil.rmtree(proxy_logs)
+        proxy_logs.mkdir(parents=True, exist_ok=True)
+        os.chmod(proxy_logs, 0o777)      # squid's uid is not ours and not fixed
+    except OSError as exc:
+        log(f"cannot prepare {proxy_logs} for squid: {exc}", level="ERROR")
+
+
 def ensure_proxy(restart: bool = False) -> None:
     c = jail_cfg()
+    prepare_proxy_logs()
+    # status=running matters: a crash-looping squid still answers `docker ps`,
+    # so without it a proxy that can never start is mistaken for a healthy one
+    # and never rebuilt.
     running = docker("ps", "-q", "--filter", "name=^nightshift-proxy$",
+                     "--filter", "status=running",
                      check=False, timeout=60).stdout.strip()
     if running and not restart:
         return
@@ -644,6 +708,22 @@ def cmd_selftest() -> int:
                 "backup"):
         check(f"/data/{sub} exists", (DATA / sub).is_dir())
 
+    # 1b. the queue the dashboard writes into, and the two trees it reads
+    for folder in (runs.QUEUE, runs.CONTROL):
+        folder.mkdir(parents=True, exist_ok=True)
+        check(f"{folder} exists", folder.is_dir())
+    check("charters/ writable (a finished run is archived there)",
+          runs.ARCHIVE.is_dir() and os.access(runs.ARCHIVE, os.W_OK), str(runs.ARCHIVE))
+    repos = runs.available_repos() if runs.SOURCE_ROOT.is_dir() else []
+    check(f"{runs.SOURCE_ROOT} readable (charter projects are cloned from it)",
+          runs.SOURCE_ROOT.is_dir(),
+          f"{len(repos)} repo(s) offered: {', '.join(r['name'] for r in repos[:6])}")
+    queued = runs.queue_list()
+    active = runs.active_run()
+    check("run state readable", True,
+          f"active: {('run %s — %s' % (active['run_no'], active['title'])) if active else 'none'}"
+          f" · queued: {len(queued)}")
+
     # 2. inner docker daemon
     try:
         info = docker("info", "--format",
@@ -934,7 +1014,7 @@ def parse_command(message: str, secret: str) -> list[str]:
     if not text.startswith(secret):
         return []
     rest = text[len(secret):].lstrip(": ").strip().lower()
-    return [rest] if rest in {"pause", "resume", "stop", "status", "digest"} else []
+    return [rest] if rest in runs.COMMANDS else []
 
 
 def handle_command(cmd: str, state: dict) -> None:
@@ -957,6 +1037,15 @@ def handle_command(cmd: str, state: dict) -> None:
         ntfy(status_text(state), title="NIGHTSHIFT: status")
     elif cmd == "digest":
         run_auditor(state, forced=True)
+    elif cmd == "finish":
+        # Not acted on here: the loop archives between tasks, never under an agent.
+        state["finish_requested"] = True
+        ntfy("This run will be archived and the next queued charter armed as soon as "
+             "the task in flight finishes.", title="NIGHTSHIFT: finishing run")
+    elif cmd == "plan-now":
+        state["planner_due"] = True
+        ntfy("The planner will run on the next loop iteration.",
+             title="NIGHTSHIFT: planner queued")
     state_save(state)
 
 
@@ -969,7 +1058,11 @@ def status_text(state: dict) -> str:
     merges_today = sum(1 for e in read_usage() if e.get("ts", "").startswith(today)
                        and e.get("role") == "merge")
     limit = state.get("limit_until")
-    return (f"task: {state.get('current_task') or 'idle'}\n"
+    run = runs.active_run() or {}
+    queued = len(runs.queue_list())
+    return (f"run: {('%s — %s' % (run.get('run_no'), run.get('title'))) if run else 'none armed'}\n"
+            f"queued charters: {queued}\n"
+            f"task: {state.get('current_task') or 'idle'}\n"
             f"queue: {ready} ready\n"
             f"merges today: {merges_today} (total {state.get('merges_total', 0)})\n"
             f"parked in a row: {state.get('consecutive_failures', 0)}\n"
@@ -981,7 +1074,7 @@ def status_text(state: dict) -> str:
 
 def run_deadline_text(state: dict) -> str:
     cfg = load_config()
-    hours = cfg["loop"].get("run_until_hours", 0)
+    hours = run_hours(state, cfg)
     armed_at = state.get("armed_at")
     if not hours or not armed_at:
         return "none"
@@ -1107,6 +1200,11 @@ def run_planner(state: dict, gov: "Governor | None" = None) -> bool:
     state["last_planner_run"] = ts()
     state["merges_since_planner"] = 0
     state["planner_due"] = False
+    state_save(state)
+    # A planner run that validated and applied nothing is the charter saying it
+    # is finished. Counted only here, where a refusal or unusable JSON - which
+    # returned earlier - can never be mistaken for "no work left".
+    state["idle_planner_streak"] = 0 if applied else state.get("idle_planner_streak", 0) + 1
     state_save(state)
     log(f"planner applied {applied} op(s), rejected {len(rejected)}")
     if rejected:
@@ -1425,14 +1523,25 @@ def start_command_listener() -> None:
     STOP file and idles.
     """
     def loop() -> None:
+        tick = 0
         while True:
             try:
-                state = state_load()
-                for cmd in ntfy_poll_commands(state):
-                    handle_command(cmd, state)
+                # The web UI writes a file per command rather than touching
+                # state.json. Polled often: a stop button that answers in half a
+                # minute is not a button. State is re-read per command, because an
+                # ntfy poll can take fifteen seconds and the loop arms, merges and
+                # pauses inside that window.
+                for entry in runs.control_pop():
+                    log(f"web command: {entry['cmd']}")
+                    handle_command(entry["cmd"], state_load())
+                if tick % 10 == 0:
+                    state = state_load()
+                    for cmd in ntfy_poll_commands(state):
+                        handle_command(cmd, state_load())
             except Exception as exc:  # noqa: BLE001 - never let this thread die
                 log(f"command listener error: {type(exc).__name__}: {exc}", level="WARN")
-            time.sleep(30)
+            tick += 1
+            time.sleep(3)
 
     threading.Thread(target=loop, daemon=True, name="commands").start()
 
@@ -1476,7 +1585,7 @@ def cmd_run() -> int:
 
     state = state_load()
     gov = Governor(cfg)
-    armed = plan.CHARTER.exists() and state.get("charter_sha256")
+    idle_logged = 0.0
 
     while True:
         try:
@@ -1490,19 +1599,49 @@ def cmd_run() -> int:
                 ntfy(f"Paused: only {free:.1f} GB free on /data.",
                      title="NIGHTSHIFT: disk pressure", priority="urgent", tags="warning")
 
+            armed = plan.CHARTER.exists() and bool(state.get("charter_sha256"))
+
             if STOP_FILE.exists() or state.get("paused"):
+                # "Pause, then wrap this run up" is one intention, and a paused
+                # loop is the safest moment to archive: nothing is in flight.
+                # The STOP file is not pause, though - it is the kill switch, and
+                # nothing moves, archiving included, until it is taken away.
+                if armed and state.get("finish_requested") and not STOP_FILE.exists():
+                    finish_run(state, cfg, "finished on request")
                 time.sleep(cfg["loop"]["idle_sleep_sec"])
                 continue
 
-            if deadline_reached(state, cfg):
-                finish_run(state, cfg)
+            if armed and deadline_reached(state, cfg):
+                finish_run(state, cfg, f"{run_hours(state, cfg)}h run deadline reached")
+                continue
+            if armed and state.get("finish_requested"):
+                finish_run(state, cfg, "finished on request")
                 continue
 
             if not armed:
-                log("not armed yet: no charter hash recorded (run 'nightshift.py arm')")
+                # One charter ends, the next begins: this is what makes the stack a
+                # service rather than a single run. Nothing is armed automatically
+                # that Tim did not queue himself.
+                mark_progress("activating next charter")
+                run = runs.activate_next(state, log=log, notify=ntfy)
+                if run is not None:
+                    state_save(state)
+                    hc_ping("", f"armed run {run['run_no']}: {run['title']}")
+                    continue
+                state_save(state)
+                if time.time() - idle_logged > 1800:
+                    if plan.CHARTER.exists():
+                        # A charter written to /data/plan by hand, or one left
+                        # behind by an interrupted arming. The queue cannot move
+                        # past it, so say so rather than reporting an empty idle.
+                        log("a charter is on disk but not armed: run "
+                            "'nightshift.py arm', or remove /data/plan/CHARTER.md "
+                            "to let the queue through", level="WARN")
+                    else:
+                        log(f"idle: nothing armed, "
+                            f"{len(runs.queue_list())} charter(s) queued")
+                    idle_logged = time.time()
                 time.sleep(cfg["loop"]["idle_sleep_sec"])
-                state = state_load()
-                armed = bool(state.get("charter_sha256"))
                 continue
 
             mark_progress("charter check")
@@ -1523,7 +1662,10 @@ def cmd_run() -> int:
                     and hour >= cfg["housekeeping"]["run_at_hour"]):
                 housekeeping(state)
             if ((state.get("last_auditor_run") or "")[:10] != now().strftime("%Y-%m-%d")
-                    and hour >= cfg["auditor"]["daily_at_hour"]):
+                    and hour >= cfg["auditor"]["daily_at_hour"]
+                    # The auditor is an Opus call reading merge diffs. A run that
+                    # has merged nothing gives it nothing to read.
+                    and runs.run_stats()["merges"]):
                 run_auditor(state, gov=gov)
 
             mark_progress("planner")
@@ -1534,7 +1676,14 @@ def cmd_run() -> int:
                 if state.get("limit_until"):
                     continue          # quota is spent; wait_if_limited sleeps it off
             if task is None:
-                log("no ready task and the planner added none; idling")
+                streak = state.get("idle_planner_streak", 0)
+                limit = cfg.get("runs", {}).get("finish_after_idle_planner_runs", 3)
+                if limit and streak >= limit:
+                    finish_run(state, cfg,
+                               f"charter complete: {streak} planner runs added nothing")
+                    continue
+                log(f"no ready task and the planner added none; idling "
+                    f"(idle planner runs: {streak})")
                 time.sleep(cfg["loop"]["idle_sleep_sec"])
                 continue
 
@@ -1546,6 +1695,9 @@ def cmd_run() -> int:
 
             if outcome in ("merged", "parked"):
                 gov.on_success(state)
+            if outcome == "merged":
+                state["idle_planner_streak"] = 0
+                state_save(state)
             if state.get("consecutive_failures", 0) >= cfg["loop"]["max_consecutive_failures"]:
                 state.update(paused=True,
                              pause_reason=f"{state['consecutive_failures']} tasks parked in a row")
@@ -1568,26 +1720,53 @@ def cmd_run() -> int:
                      title="NIGHTSHIFT: loop errors", priority="urgent", tags="rotating_light")
 
 
+def run_hours(state: dict, cfg: dict) -> int:
+    """The deadline in force: the charter's own, else the config default."""
+    hours = (runs.active_run() or {}).get("run_until_hours")
+    if hours is None:
+        hours = cfg["loop"].get("run_until_hours", 0)
+    return int(hours or 0)
+
+
 def deadline_reached(state: dict, cfg: dict) -> bool:
-    hours = cfg["loop"].get("run_until_hours", 0)
+    hours = run_hours(state, cfg)
     armed_at = state.get("armed_at")
     if not hours or not armed_at:
         return False
     return time.time() >= datetime.fromisoformat(armed_at).timestamp() + hours * 3600
 
 
-def finish_run(state: dict, cfg: dict) -> None:
-    """Deadline handling: stop spending quota, then report on the whole run."""
-    hours = cfg["loop"]["run_until_hours"]
-    state.update(paused=True, pause_reason=f"{hours}h run deadline reached")
+def finish_run(state: dict, cfg: dict, reason: str) -> None:
+    """End the active charter: last digest, archive, make way for the next one.
+
+    Called only from the top of the loop, so no agent is running and no worktree
+    is half-merged. Archiving is what lets the next charter start unattended; if
+    it fails the run is left exactly as it was and the loop pauses instead.
+    """
+    log(f"finishing run: {reason}")
+    # A run that merged nothing has nothing to audit, and the auditor is an Opus
+    # call: a charter cancelled an hour after arming must not cost a digest that
+    # can only say "no merges".
+    if runs.run_stats()["merges"]:
+        try:
+            run_auditor(state, forced=True)
+        except Exception as exc:  # noqa: BLE001 - the archive matters more than the report
+            log(f"final audit failed: {exc}", level="WARN")
+    else:
+        log("no merges in this run; skipping the final digest")
+
+    if cfg.get("runs", {}).get("archive_on_finish", True):
+        archived = runs.finish_active(state, reason=reason, log=log, notify=ntfy)
+        state_save(state)
+        if archived is not None:
+            queued = len(runs.queue_list())
+            log(f"archived to {archived}; {queued} charter(s) queued")
+            return
+
+    state.update(paused=True, pause_reason=reason)
     state_save(state)
-    log(f"run deadline of {hours}h reached; pausing")
-    try:
-        run_auditor(state, forced=True)
-    except Exception as exc:  # noqa: BLE001 - the pause matters more than the report
-        log(f"final audit failed: {exc}", level="WARN")
-    ntfy(f"The {hours}-hour run is over. {state.get('merges_total', 0)} task(s) merged in "
-         f"total.\n\nNothing further will run until you resume. Review with:\n"
+    ntfy(f"The run is over ({reason}). {state.get('merges_total', 0)} task(s) merged.\n\n"
+         f"Nothing further will run until you resume. Review with:\n"
          f"git --git-dir=~/nightshift/data/repos/<project>.git log --oneline agent/integration",
          title="NIGHTSHIFT: run finished", priority="high", tags="checkered_flag")
 
@@ -1611,8 +1790,20 @@ def cmd_arm() -> int:
     state = state_load()
     state["charter_sha256"] = plan.charter_hash()
     state["armed_at"] = ts()
-    state.update(paused=False, pause_reason="", consecutive_failures=0)
+    state.update(paused=False, pause_reason="", consecutive_failures=0,
+                 idle_planner_streak=0, finish_requested=False)
     state_save(state)
+    if runs.active_run() is None:
+        title = next((line.lstrip("# ").strip() for line in plan.charter_text().splitlines()
+                      if line.startswith("# ")), "charter armed by hand")
+        runs.write_atomic(runs.ACTIVE_FILE, json.dumps({
+            "run_no": runs.next_run_no(), "id": f"manual-{now():%Y%m%d-%H%M%S}",
+            "title": title, "slug": runs.slugify(title), "goals": goals,
+            "projects": {name: {"source": "", "ref": "HEAD"} for name in projects},
+            "test_cmds": {n: p.get("test_cmd", "") for n, p in projects.items()},
+            "run_until_hours": None, "armed_at": state["armed_at"],
+            "charter_sha256": state["charter_sha256"],
+        }, indent=2) + "\n")
     hours = load_config()["loop"].get("run_until_hours", 0)
     if hours:
         ends = datetime.fromtimestamp(time.time() + hours * 3600)
@@ -1634,9 +1825,13 @@ def main(argv: list[str]) -> int:
         return cmd_arm()
     if cmd == "setup":
         return cmd_setup(argv)
+    if cmd == "web":
+        import web
+        return web.serve()
     if cmd == "notify":
         return 0 if ntfy(" ".join(argv[2:]) or "test", title="NIGHTSHIFT: manual") else 1
-    print("usage: nightshift.py [run|selftest|setup|arm|notify <msg>]", file=sys.stderr)
+    print("usage: nightshift.py [run|web|selftest|setup|arm|notify <msg>]",
+          file=sys.stderr)
     return 2
 
 

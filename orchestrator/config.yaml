@@ -60,3 +60,20 @@ governor:
   limit_backoff_min: [15, 30, 60, 120]
   max_other_errors: 6
   weekly_cap_notify_hours: 24
+
+runs:
+  # A run ends by itself in two ways: its deadline passes, or the planner runs out
+  # of things to add. The second is counted in planner runs that returned usable
+  # JSON and applied no ops - a refused or unparseable planner run never counts, or
+  # a bad afternoon would archive a charter that still had work in it.
+  finish_after_idle_planner_runs: 3
+  # Archive the finished run under charters/ and arm the next queued charter. With
+  # this off the loop pauses at the end of a run the way it did before the queue.
+  archive_on_finish: true
+
+web:
+  port: 8080
+  # Lines of orchestrator.log the dashboard may tail in one request.
+  log_tail_lines: 500
+  # Read-only mode for the UI: no queueing, no pause/stop, no finishing a run.
+  read_only: false

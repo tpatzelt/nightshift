@@ -23,8 +23,10 @@ RUN pip install --no-cache-dir PyYAML==6.0.2
 RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin ns
 
 WORKDIR /app
-COPY --chown=root:root nightshift.py plan.py gates.py healthcheck.py config.yaml ./
+COPY --chown=root:root nightshift.py plan.py gates.py runs.py web.py healthcheck.py config.yaml ./
 COPY --chown=root:root prompts/ ./prompts/
+# Served by `nightshift.py web`; no build step, no bundler, no CDN.
+COPY --chown=root:root static/ ./static/
 COPY --chown=root:root tests/ ./tests/
 
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1

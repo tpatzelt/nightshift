@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>NIGHTSHIFT</title>
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#127769;</text></svg>">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="moon" aria-hidden="true">&#9790;</span>
+    <div>
+      <h1>NIGHTSHIFT</h1>
+      <p id="run-line" class="run-line">loading…</p>
+    </div>
+  </div>
+  <div class="top-right">
+    <span id="status-pill" class="pill">…</span>
+    <div class="controls" id="controls"></div>
+  </div>
+</header>
+
+<section class="tiles" id="tiles"></section>
+
+<section class="now" id="now-card"></section>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="board" class="active">Board</button>
+  <button data-tab="charters">Charters</button>
+  <button data-tab="progress">Progress</button>
+  <button data-tab="runs">Runs</button>
+  <button data-tab="log">Log</button>
+</nav>
+
+<main>
+  <section id="tab-board" class="tab active">
+    <div class="board" id="board"></div>
+  </section>
+
+  <section id="tab-charters" class="tab">
+    <div class="split">
+      <div class="col">
+        <h2>Queue</h2>
+        <p class="hint">The orchestrator arms the top entry as soon as the run in
+          flight is archived. Nothing here is armed that you did not queue.</p>
+        <div id="queue-list" class="queue-list"></div>
+      </div>
+      <div class="col">
+        <h2>New charter</h2>
+        <div class="mode-switch">
+          <button id="mode-form" class="active">Guided</button>
+          <button id="mode-raw">Raw markdown</button>
+        </div>
+
+        <form id="charter-form" class="form" autocomplete="off">
+          <label>Title
+            <input name="title" required maxlength="120"
+                   placeholder="job-application-agent: make triage explain itself">
+          </label>
+
+          <fieldset>
+            <legend>Project</legend>
+            <label>Repository
+              <select name="repo" id="repo-select"></select>
+            </label>
+            <label>Base branch
+              <select name="ref" id="ref-select"></select>
+            </label>
+            <label>Test command
+              <input name="test_cmd" value="uv run pytest -q" required>
+            </label>
+            <label class="check" id="fresh-wrap" hidden>
+              <input type="checkbox" name="fresh_clone">
+              <span>Re-clone from scratch (the current bare repo is kept, renamed)</span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Goals</legend>
+            <div id="goals"></div>
+            <button type="button" id="add-goal" class="ghost">+ add goal</button>
+          </fieldset>
+
+          <label>Non-goals <span class="sub">one per line</span>
+            <textarea name="non_goals" rows="3"
+              placeholder="No changes to deployment: Dockerfile, .github/**, lockfiles."></textarea>
+          </label>
+
+          <label>Constraints <span class="sub">one per line</span>
+            <textarea name="constraints" rows="3"
+              placeholder="uv run pytest -q must stay green."></textarea>
+          </label>
+
+          <label>Run deadline <span class="sub">hours; 0 means no deadline</span>
+            <input name="run_until_hours" type="number" min="0" max="720" value="48">
+          </label>
+
+          <details class="preview">
+            <summary>Charter markdown</summary>
+            <pre id="charter-preview"></pre>
+          </details>
+        </form>
+
+        <div id="raw-wrap" hidden>
+          <label class="form">Charter markdown
+            <textarea id="raw-charter" rows="22" spellcheck="false"></textarea>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button id="validate-btn" class="ghost">Validate</button>
+          <button id="queue-btn" class="primary">Queue charter</button>
+        </div>
+        <p id="form-msg" class="msg"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-progress" class="tab">
+    <div class="split">
+      <div class="col">
+        <h2>Charter goals</h2>
+        <div id="goals-panel"></div>
+        <h2>Work per day</h2>
+        <div class="charts" id="charts"></div>
+      </div>
+      <div class="col">
+        <h2>Latest digest</h2>
+        <div id="digest"></div>
+        <h2>Planner decisions</h2>
+        <div id="decisions" class="list"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-runs" class="tab">
+    <div class="split">
+      <div class="col">
+        <h2>Finished runs</h2>
+        <div id="runs-list" class="list"></div>
+      </div>
+      <div class="col">
+        <h2 id="run-doc-title">Run detail</h2>
+        <div id="run-doc" class="doc"><p class="hint">Pick a run to read its RESULT.md.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-log" class="tab">
+    <h2>orchestrator.log</h2>
+    <pre id="log" class="log">…</pre>
+  </section>
+</main>
+
+<div id="drawer" class="drawer" hidden>
+  <div class="drawer-inner">
+    <button id="drawer-close" class="ghost close">close</button>
+    <div id="drawer-body"></div>
+  </div>
+</div>
+
+<footer><span id="footer-note">polling every 5s</span></footer>
+<script src="app.js"></script>
+</body>
+</html>

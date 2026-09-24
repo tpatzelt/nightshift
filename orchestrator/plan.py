@@ -7,13 +7,16 @@ validate that JSON and decide what the orchestrator is willing to apply.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import subprocess
 from pathlib import Path
 
 import yaml
 
-PLAN = Path("/data/plan")
+# /data everywhere in production; overridable so the tests can run a whole plan
+# directory out of a temporary folder without a container.
+PLAN = Path(os.environ.get("NS_DATA_DIR", "/data")) / "plan"
 CHARTER = PLAN / "CHARTER.md"
 ROADMAP = PLAN / "ROADMAP.md"
 BACKLOG = PLAN / "backlog"
@@ -86,20 +89,24 @@ def charter_hash() -> str:
     return hashlib.sha256(CHARTER.read_bytes()).hexdigest()
 
 
-def charter_goals() -> list[str]:
-    """Goal ids declared in the charter, e.g. ['G1', 'G2']."""
+def goals_in(text: str) -> list[str]:
+    """Goal ids declared in a charter, e.g. ['G1', 'G2']."""
     goals = []
-    for line in charter_text().splitlines():
+    for line in text.splitlines():
         for match in re.finditer(r"\b(G\d+)\b\s*:", line):
             if match.group(1) not in goals:
                 goals.append(match.group(1))
     return goals
 
 
-def charter_projects() -> dict[str, dict]:
+def charter_goals() -> list[str]:
+    return goals_in(charter_text())
+
+
+def projects_in(text: str) -> dict[str, dict]:
     """Parse the '- repo: x  goals: [...]  test_cmd: "..."' lines."""
     projects: dict[str, dict] = {}
-    for line in charter_text().splitlines():
+    for line in text.splitlines():
         line = line.strip()
         if not line.startswith("- repo:"):
             continue
@@ -113,6 +120,10 @@ def charter_projects() -> dict[str, dict]:
         if entry.get("repo"):
             projects[entry["repo"]] = entry
     return projects
+
+
+def charter_projects() -> dict[str, dict]:
+    return projects_in(charter_text())
 
 
 # ---------------------------------------------------------------------- tasks
