@@ -40,6 +40,31 @@ The auditor's drift score stayed at 2, and no diff touched `Dockerfile`,
 
 627 of those 1087 runs came back rate-limited, 567 of them planner runs.
 
+## Merged and deployed
+
+Both branches are on `main` (PR #11 then #12, 2026-09-24), and the bot was redeployed
+from `ghcr.io/tpatzelt/job-application-agent@sha256:12877252` — the CI build of
+`main@26a24d8`. That also ended a separate drift: the image the bot had been running
+since 2026-09-11 was a local `docker compose build` hand-tagged as the GHCR name, so
+`main` and the registry were both behind the live bot until #11 landed.
+
+### One defect escaped every gate
+
+CI went red on the merge commit: two tests in `tests/test_rebaseline.py` failed, and
+they failed locally too. `evals/rebaseline.py` resolved "the arming revision" from
+`CANDIDATE_REVISIONS = ("origin/main", …)`, which pointed at the arming commit **only
+because the sandbox's bare repo had `main = b6da8dd`**. Merging moved those refs onto
+the new code, so the harness replayed today's `src/` against its own baseline
+(`assert 16 == 27`). Fixed in PR #13 by preferring the revision already recorded in
+`evals/baseline.json` and refusing rather than falling back when it cannot be resolved,
+plus `fetch-depth: 0` in `ci.yml` so a shallow clone does not silently skip the tests.
+
+The lesson is about the sandbox, not the agents: **the bare repo's ref topology is not
+the topology the work lands in.** Nothing the agents could run — 42 merge gates, the
+reviewer, the auditor — could see it, because in the sandbox the code was correct. Worth
+a gate that replays a merged integration branch against a checkout whose `origin/main`
+is the *real* origin's, before the branches leave.
+
 ## What to fix before arming run 2
 
 1. **The planner's idle floor is not applied to a failed run.** `run_planner` writes
