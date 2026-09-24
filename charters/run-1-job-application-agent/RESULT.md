@@ -2,7 +2,7 @@
 
 Armed 2026-09-22 16:59 +0200, frozen 2026-09-24 14:20 +0200 (~45 h wall, 10.7 h of
 agent wall time). Charter: [CHARTER.md](CHARTER.md) · roadmap: [ROADMAP.md](ROADMAP.md)
-· planner reasoning: [decisions/](decisions/) · daily digests: [digests/](digests/).
+· planner reasoning: [decisions/](decisions/) · daily digests: [digests/](digests/) · per-run token and cost ledger: [usage.jsonl](usage.jsonl).
 
 ## Outcome
 
