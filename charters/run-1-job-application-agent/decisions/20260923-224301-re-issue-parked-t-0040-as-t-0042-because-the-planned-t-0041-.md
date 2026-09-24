@@ -1,0 +1,12 @@
+# Re-issue parked T-0040 as T-0042 because the planned T-0041 never reached the backlog
+
+_Recorded 20260923-224301 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty, although the two previous ADRs both said they would add T-0041. /plan/backlog contains only EXAMPLE.yaml.txt, so neither add_task was applied. The cause is not visible from here. It could be an id clash or a rejected field. I checked the repo at HEAD b7f718e. find_landing_marker exists at src/page_signals.py:139 and nothing calls it. The stale gate that the new gate should follow is at src/orchestrator.py:437 and in replay_keep in evals/offline_eval.py. skipped_stale is at src/run_report.py:26, and test_stale_posting_skipped_without_scoring is at tests/test_location_and_freshness.py:68. All five allowed_paths exist. G1 and G3 have no open definition-of-done items that are not already covered by merged tasks.
+
+## Decision
+Add T-0042 with depends_on: []. It has the same approved scope as T-0040, and its notes now spell out the test the reviewer asked for: two records that differ only in their text, where the landing text is dropped, the ordinary text is kept, and the worker confirms locally that the assertion fails with the gate commented out. It also requires an orchestrator test that counts skipped_landing. I chose a fresh id instead of T-0041 in case the id was the reason for the rejection. Assumptions, all chosen conservatively: protected_paths contains every entry from T-0040's list, with tests/test_page_signals.py added, so the list only grows; max_diff_lines is 250; T-0040 stays parked and must not be revived alongside T-0042; no live Brave or OpenRouter calls are needed because the offline replay already pinpoints the miss; no other tasks are scheduled.
+
+## Consequences
+If T-0042 merges, the replay should show posting_shape_rate and aggregator_drop_rate at 1.000 with no metric regressing. That is a prediction, not a verified result. It would meet G2's definition of done by a margin, and after that only the charter's idle work (tests, docs and small refactors within G1–G3) should be scheduled. If T-0042 is parked again, split it: the orchestrator gate and its test first, then the replay gate and the two-record test. If T-0042 also fails to appear in the backlog, the problem is in how add_task ops are applied, not in the task, and the next pass should report blocked instead of re-issuing a third time.

@@ -1,0 +1,51 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- In notify_results, deduplicate `pending` by canonical_url(result.url), keeping the
+  first occurrence and preserving order. Do this whether ledger_path is set or None.
+  Change nothing else in the message format.
+- 'Add a test in tests/test_notify_ledger.py using its existing _result/_Response
+  helpers and the requests.post monkeypatch. Pass two results whose URLs differ only
+  in scheme/www and assert exactly one entry is sent: the posting URL appears once,
+  and the header reads ''1 new job(s) found:''. The test must fail on the current
+  src/notifier.py.'
+- Keep test_ledger_path_none_preserves_prior_behaviour passing. It covers cross-call
+  behaviour with no ledger, which this task does not change.
+- No network, no TELEGRAM_BOT_TOKEN, no new dependencies.
+created: 2026-09-23T17:53:15+0200
+max_diff_lines: 120
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0035
+project: job-application-agent
+charter_goal: G3
+roadmap_ref: M3
+title: TelegramNotifier never repeats a posting that appears twice in one results
+  list
+why: Idle work within G3 (its goals are met). The charter's G3 definition of done
+  says 'a job already notified is provably not notified again'. At the notifier boundary
+  this holds only across runs, through the ledger. In TelegramNotifier.notify_results
+  (src/notifier.py:76), `pending` filters against self._notified but is not deduplicated
+  within the call. So results=[JobResult(url='https://jobs.lever.co/a/1'), JobResult(url='http://www.jobs.lever.co/a/1')]
+  sends the same posting twice in one message, and the header says '2 new job(s)'.
+  Today only the upstream seen_urls handling in src/orchestrator.py prevents this.
+  The notifier should guarantee it itself, so the proof does not depend on another
+  module.
+acceptance:
+- uv run pytest -q tests/test_notify_ledger.py tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/notifier.py
+- tests/test_notify_ledger.py
+protected_paths:
+- src/orchestrator.py
+- src/bot_service.py
+- src/telegram_api.py
+- src/url_heuristics.py
+- evals/**
+- tests/test_run_quality.py
+merged_sha: 48badfc
+merged_at: 2026-09-23T17:56:28+0200

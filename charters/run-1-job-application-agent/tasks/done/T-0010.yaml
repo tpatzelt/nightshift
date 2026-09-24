@@ -1,0 +1,49 @@
+depends_on:
+- T-0004
+new_tests_required: true
+attempts: 0
+notes:
+- Include result.reason in _format_result, truncated to a sane per-entry length so
+  one verbose LLM reason cannot push a whole batch over MAX_MESSAGE_CHARS, and handle
+  an empty reason by omitting the line rather than printing a blank one. _build_message's
+  existing packing and chunking behaviour must be preserved - tests/test_notifier.py::test_notify_chunks_long_result_lists
+  must still pass. Add tests asserting the reason text appears in the sent payload,
+  that an empty reason produces no stray blank line, and that a 5000-char reason still
+  yields chunks each within MAX_MESSAGE_CHARS. Do not change the LLM prompt that produces
+  the reason.
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0010
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Job messages say why the job matched
+why: TelegramNotifier._format_result (src/notifier.py:43) prints title, company, score
+  and URL but drops JobResult.reason, so the user gets a number with no explanation.
+  G3 requires messages that state why a job matched.
+acceptance:
+- uv run pytest -q tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/notifier.py
+- tests/test_notifier.py
+protected_paths:
+- evals/**
+- src/url_heuristics.py
+- src/page_signals.py
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/telegram_api.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 7
+merged_sha: 74c1e95
+merged_at: 2026-09-23T08:16:07+0200

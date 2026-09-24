@@ -1,0 +1,12 @@
+# Schedule the last G2 headroom (soft-404 landing pages) as a page-signal gate; roadmap otherwise at definition of done
+
+_Recorded 20260923-220409 by the NIGHTSHIFT planner._
+
+## Context
+The backlog was empty. I replayed the committed corpus with the current tree (read-only mount, so the report was not written; the table printed). TOTAL: posting_shape 0.941 (arming baseline 0.815), aggregator_drop 0.941 (0.765), location 1.000 (1.000), staleness 1.000 (0.429), dedup 1.000 (0.571). The G2 definition of done is already met with no regression. G1 (harness, README metric docs, tests) and the G3 slices (why-matched, ledger, in-list dedup, scan-error text, send-boundary content tests T-0032..T-0035) have all merged. The one remaining miss for both headline metrics is a single record: an expired whatjobs ?id= URL that serves the site's home page with HTTP 200. The URL classifier is correct to call that URL shape a posting (an existing test says so). The information that it is dead is only on the page.
+
+## Decision
+Add one G2/M2 task, T-0037. It adds a narrow soft-404/search-landing page signal to src/page_signals.py, wires it into Orchestrator._process_url next to the stale gate, and mirrors it in evals/offline_eval.replay_keep so the harness keeps replaying production order. The corpus and evals/baseline.json are protected for this task, so the fix cannot be scored by relabelling. Parked T-0007..T-0031 stay parked: each was superseded by a merged re-issue, and reviving any of them would duplicate merged work. No new milestones: M1–M3 cover all charter goals. Assumptions: (a) task field names follow the shape used by earlier tasks (id/title/project/charter_goal/milestone/depends_on/allowed_paths/protected_paths/max_diff_lines/description/acceptance); (b) the charter's `evals/runs/**` wording refers to the recorded corpus that earlier merged work placed under evals/fixtures, and I did not re-litigate that; (c) a single plain page fetch is within 'keep exploratory runs small', so it is offered as optional and not required.
+
+## Consequences
+If T-0037 lands, both headline metrics reach 1.000 on the current corpus and the corpus has no known G2 headroom left. Further G2 work would first need new labelled records captured from live runs. After that, the only valid work is the charter's idle work (tests, docs, small refactors within G1–G3). Risk: an over-broad landing detector could drop real postings. The acceptance criteria require negative tests built from real kept postings, and --check-baseline blocks any per-metric regression.

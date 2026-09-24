@@ -1,0 +1,78 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Keep the ledger inside TelegramNotifier so the fix stays in the modules G3 names:
+  an optional ledger_path constructor argument, default None meaning today''s behaviour
+  exactly. notify_results filters out results whose canonical_url is already in the
+  ledger, and records a URL only after its message actually sent (the bool from _send)
+  — so a Telegram outage leaves the job unnotified and retryable rather than silently
+  swallowed. Note that _build_messages batches several results into one message: a
+  URL may only be recorded if the message that carried it sent, so map entries to
+  their message before recording.'
+- 'Wire it at the two construction sites, both re-checked in the tree today: src/bot_service.py:296
+  constructs the notifier and src/bot_service.py:299 computes `paths = self._store.crawl_paths(chat_id)`
+  just after it — move that lookup above the construction and derive the ledger path
+  as paths[''cache_path''].parent / ''notified.json''. Do not add a key to user_store.crawl_paths
+  (src/user_store.py is protected). src/main.py:43 constructs the other one; put the
+  ledger next to root / config.cache_path.'
+- Store JSON; create on demand; an unreadable, corrupt or non-JSON ledger logs a warning
+  and reads as empty, never raises — a notifier failure must not break a crawl. Use
+  src.url_heuristics.canonical_url for the key so the ledger and the cache agree;
+  when T-0023 lands, existing ledger keys stop matching and a posting notified before
+  it may be announced once more. That is the same one-time, self-healing effect T-0023
+  accepts for cache.json; say so in the task output.
+- 'Tests: two runs over the same result notify once; a result whose send returned
+  False is not recorded and IS re-sent on the next run; a corrupt ledger file degrades
+  to empty without raising; a ledger_path of None preserves today''s behaviour; the
+  ''Why:'' reason line added by T-0010 still appears. No live Telegram call and no
+  network — monkeypatch requests.post as tests/test_notifier.py already does. TELEGRAM_BOT_TOKEN
+  is deliberately absent from the sandbox and must stay that way.'
+created: 2026-09-23T08:22:05+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0024
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: 'Never notify twice: a durable ledger of delivered postings (supersedes parked
+  T-0015)'
+why: 'Orchestrator._notify (src/orchestrator.py:272) discards the bool notify_results
+  returns, and the seen-URL cache is saved at :230 before notification happens at
+  :243, so a posting whose send failed is marked seen and never re-sent, while a lost
+  or re-keyed cache announces the same posting again. G3''s definition of done requires
+  that a job already notified is provably not notified again. Re-issues parked T-0015
+  with depends_on cleared: its real dependencies T-0010 and T-0016 are merged, and
+  the dependency on T-0008 was an ordering preference that left a G3 definition-of-done
+  item hostage to a G2 chain which has now stalled twice.'
+acceptance:
+- uv run pytest -q tests/test_notify_ledger.py
+- uv run pytest -q tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/notifier.py
+- src/bot_service.py
+- src/main.py
+- tests/test_notifier.py
+- tests/test_notify_ledger.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/url_heuristics.py
+- src/page_signals.py
+- src/crawler_engine.py
+- src/telegram_api.py
+- src/user_store.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 5
+merged_sha: 743cca4
+merged_at: 2026-09-23T13:10:35+0200

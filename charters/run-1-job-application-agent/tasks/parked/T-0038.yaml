@@ -1,0 +1,80 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- Add a narrow, stdlib-only function to src/page_signals.py, for example find_landing_marker(text)
+  -> str | None. It should recognise a site-wide search or home landing page served
+  in place of a posting. Base it on generic search-form or landing boilerplate (German
+  and English), not on the WhatJobs host or the record's exact text. It must not match
+  the text of any record labelled kind=posting in evals/fixtures/**.
+- Call it in Orchestrator._process_url right after the stale gate. Log it and count
+  it (e.g. self._report.count('skipped_landing')), and add the URL to seen_urls, the
+  same way the stale gate does. In evals/offline_eval.replay_keep, add the matching
+  check right after find_stale_marker so the replay keeps production order.
+- 'Tests: a positive test in tests/test_page_signals.py using the landing text; negative
+  tests using at least three real posting texts from the corpus (one German); and
+  one replay_keep test in tests/test_offline_eval.py that fails without the change.
+  Do not edit tests/test_url_heuristics.py. The /jobs?id= posting shape stays a POSTING.'
+- 'Run `python -m evals.offline_eval --out <tmpdir>` before and after the change and
+  put both TOTAL rows in the commit message. posting_shape_rate and aggregator_drop_rate
+  should reach 1.000 and no metric may fall. Do not edit evals/baseline.json or any
+  fixture: relabelling the record would not count as a fix.'
+- Offline only, no new dependencies. The record is already captured, so no live call
+  is needed.
+- "attempt 1: gate failures:\n  - worker reported status=None, not 'done'"
+- "attempt 2: gate failures:\n  - worker reported status=None, not 'done'"
+created: 2026-09-23T22:05:18+0200
+max_diff_lines: 200
+timeout_min: 40
+max_turns: 50
+status: parked
+id: T-0038
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Drop soft-404 search-landing pages served at a posting URL (re-issue of planned
+  T-0037, which never reached the backlog)
+why: 'This is the last G2 headroom the corpus can show. Replaying HEAD 8f821e6 offline
+  gives a TOTAL of posting_shape_rate 0.941 and aggregator_drop_rate 0.941 (arming
+  baseline 0.815 and 0.765), with the other metrics at 1.000. Both misses are the
+  same record: evals/fixtures/project-manager-berlin.jsonl line 5, https://de.whatjobs.com/jobs?id=261276305.
+  It returns HTTP 200 and its title is ''Jobs in Deutschland? | WhatJobs Deutschland''.
+  The body is only site navigation and search-form text (''Suche nach Berufsbezeichnung
+  oder Rolle und nach Standort ... Suchvorschläge und letzte Suchanfragen''). It is
+  labelled kind=index, aggregator=true, stale=false. The URL classifier is right to
+  call /jobs?id=<n> a posting: tests/test_url_heuristics.py:208 pins that shape, so
+  it must not change. The evidence that the page is dead is only in the page text.
+  The fix is therefore a page signal next to find_stale_marker (src/page_signals.py:112),
+  applied where the stale gate runs (src/orchestrator.py:437 and evals/offline_eval.py
+  replay_keep, line 94).'
+acceptance:
+- uv run pytest -q tests/test_page_signals.py tests/test_offline_eval.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --check-baseline
+allowed_paths:
+- src/page_signals.py
+- src/orchestrator.py
+- evals/offline_eval.py
+- tests/test_page_signals.py
+- tests/test_offline_eval.py
+protected_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- evals/metrics.py
+- evals/corpus.py
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+- tests/test_eval_corpus.py
+- tests/test_offline_baseline.py
+- tests/test_run_quality.py
+- src/notifier.py
+- src/bot_service.py
+- src/telegram_api.py
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+park_reason: "gate failures:\n  - worker reported status=None, not 'done'"

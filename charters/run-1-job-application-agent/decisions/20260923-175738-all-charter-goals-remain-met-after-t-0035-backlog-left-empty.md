@@ -1,0 +1,12 @@
+# All charter goals remain met after T-0035; backlog left empty and no idle task scheduled
+
+_Recorded 20260923-175738 by the NIGHTSHIFT planner._
+
+## Context
+I copied the read-only /repo/job-application-agent to /tmp and ran the gates there. `uv run python -m evals.offline_eval` exits 0, prints the per-metric table and writes evals/runs/offline/report.json. Its TOTAL row is posting_shape 0.889 (arming baseline 0.815), aggregator_drop 0.882 (0.765), location 1.000 (1.000), staleness 1.000 (0.429) and dedup 1.000 (0.571). Both required metrics beat the baseline and none is lower, so G2 is met. `uv run pytest -q` gives 340 passed, 1 skipped, which is above the 182/1 baseline, and `uv run python run_mock_test.py` exits 0. The README documents the harness commands and each metric (README.md:172-191), so G1 is met. G3's items have all merged: T-0010 (the why-matched line), T-0016 (a failed scan names what failed), T-0024 (the durable delivery ledger), T-0032, T-0033 and T-0034 (message content asserted at the send boundary, which replaced parked T-0031), and T-0035 (no repeat within one results list). The backlog is empty and there are no worker followups. Parked tasks T-0007 to T-0031 were all replaced by re-issues that have since merged.
+
+## Decision
+I added no ops this pass. No goal has open work under its definition of done. The only headroom left in the corpus is in project-manager-berlin (posting_shape 0.500, aggregator_drop 0.750). Closing it would mean new heuristic work, and the charter's idle clause allows only tests, docs and small refactors, with 'Nothing new'. I found no concrete missing test or doc gap to justify an idle task, and writing one without a real gap would only create churn. No parked task is revived, because each has a merged successor and reviving one would duplicate work. Assumptions: (1) the harness replays evals/fixtures, not evals/runs/**. I treat G1 as met because every item in its definition of done holds. (2) Using a /tmp copy to run the gates is within the sandbox. It made no network calls and wrote nothing to the repo.
+
+## Consequences
+The backlog stays empty and runners go idle. Later passes should add a task only if a worker followup or a failing gate shows a concrete test or doc gap inside G1–G3, or if the charter changes. The unused project-manager-berlin headroom is recorded here so that a human can decide to open new G2 work later if they want it.

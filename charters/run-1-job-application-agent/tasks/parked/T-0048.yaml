@@ -1,0 +1,189 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- "attempt 1: gate failures:\n  - acceptance command failed (2): In src/orchestrator.py,\
+  \ `_notify` records a failure in the run's RunReport (for example `self._report.count(\"\
+  notify_failed\")`, or a counter holding the number of undelivered results) both\
+  \ when notify_results returns False and when it raises. The existing behaviour stays:\
+  \ a notifier failure never raises out of Orchestrator.run. `orchestrator.last_report`\
+  \ exposes the counter after run() returns. If a new counter key is added, src/run_report.py\
+  \ COUNTER_LABELS gets a human label for it.\n  - acceptance command failed (127):\
+  \ In src/bot_service.py, `_"
+- 'attempt 1 gate output:
+
+  $ In src/orchestrator.py, `_notify` records a failure in the run''s RunReport (for
+  example `self._report.count("notify_failed")`, or a counter holding the number of
+  undelivered results) both when notify_results returns False and when it raises.
+  The existing behaviour stays: a notifier failure never raises out of Orchestrator.run.
+  `orchestrator.last_report` exposes the counter after run() returns. If a new counter
+  key is added, src/run_report.py COUNTER_LABELS gets a human label for it.   (exit
+  2)
+
+  bash: -c: line 1: unexpected EOF while looking for matching `''''
+
+
+  $ In src/bot_service.py, `_run_scan` sends exactly one extra message through `_safe_send`
+  when results is non-empty and last_report shows a notification failure. The message
+  names the failure as Telegram job delivery, states how many jobs the scan accepted,
+  and tells the user something truthful they can act on. It must not promise an automatic
+  retry: the orchestrator saves seen URLs to the cache before notifying, so undelivered
+  jobs are not re-found. When there is no failure the behaviour is unchanged: no extra
+  message on success, and the existing no-new-jobs message when results are empty.   (exit
+  127)
+
+  bash: line 1: _run_scan: command not found
+
+  bash: line 1: _safe_send: command not found
+
+  bash: line 1: In: command not found
+
+
+  $ New test in tests/test_agent_loop.py: with a notifier whose notify_results returns
+  False, and separately one that raises, Orchestrator.run completes and last_report
+  carries the failure counter. With a succeeding notifier the counter is absent or
+  zero.   (exit 127)
+
+  bash: line 1: New: command not found
+
+
+  $ New test in tests/test_bot_service.py, following test_run_scan_sends_no_new_jobs_message_at_send_boundary
+  (patch requests.post at the send boundary via _capture_telegram_sends and fake LLMService/CrawlerEngine/Orchestrator):
+  a FakeOrchestrator returning one or more results with the failure counter set produces
+  exactly one sent message, and the test asserts its full text. A second test with
+  results and no failure asserts that no message is sent. Both tests must fail without
+  the src change.   (exit 2)
+
+  bash: -c: line 1: syntax error near unexpected token `(''
+
+  bash: -c: line 1: `git clone -q --no-hardlinks /src /tmp/w && git -C /tmp/w fetch
+  -q --no-tags /src ''+refs/remotes/origin/*:refs/remotes/origin/*'' && cd /tmp/w
+  && New test in tests/test_bot_service.py, following test_run_scan_sends_no_new_jobs_message_at_send_boundary
+  (patch requests.post at the send boundary via _capture_telegr'
+- "attempt 2: gate failures:\n  - acceptance command failed (2): In src/orchestrator.py,\
+  \ `_notify` records a failure in the run's RunReport (for example `self._report.count(\"\
+  notify_failed\")`, or a counter holding the number of undelivered results) both\
+  \ when notify_results returns False and when it raises. The existing behaviour stays:\
+  \ a notifier failure never raises out of Orchestrator.run. `orchestrator.last_report`\
+  \ exposes the counter after run() returns. If a new counter key is added, src/run_report.py\
+  \ COUNTER_LABELS gets a human label for it.\n  - acceptance command failed (127):\
+  \ In src/bot_service.py, `_"
+- 'attempt 2 gate output:
+
+  $ In src/orchestrator.py, `_notify` records a failure in the run''s RunReport (for
+  example `self._report.count("notify_failed")`, or a counter holding the number of
+  undelivered results) both when notify_results returns False and when it raises.
+  The existing behaviour stays: a notifier failure never raises out of Orchestrator.run.
+  `orchestrator.last_report` exposes the counter after run() returns. If a new counter
+  key is added, src/run_report.py COUNTER_LABELS gets a human label for it.   (exit
+  2)
+
+  bash: -c: line 1: unexpected EOF while looking for matching `''''
+
+
+  $ In src/bot_service.py, `_run_scan` sends exactly one extra message through `_safe_send`
+  when results is non-empty and last_report shows a notification failure. The message
+  names the failure as Telegram job delivery, states how many jobs the scan accepted,
+  and tells the user something truthful they can act on. It must not promise an automatic
+  retry: the orchestrator saves seen URLs to the cache before notifying, so undelivered
+  jobs are not re-found. When there is no failure the behaviour is unchanged: no extra
+  message on success, and the existing no-new-jobs message when results are empty.   (exit
+  127)
+
+  bash: line 1: _run_scan: command not found
+
+  bash: line 1: _safe_send: command not found
+
+  bash: line 1: In: command not found
+
+
+  $ New test in tests/test_agent_loop.py: with a notifier whose notify_results returns
+  False, and separately one that raises, Orchestrator.run completes and last_report
+  carries the failure counter. With a succeeding notifier the counter is absent or
+  zero.   (exit 127)
+
+  bash: line 1: New: command not found
+
+
+  $ New test in tests/test_bot_service.py, following test_run_scan_sends_no_new_jobs_message_at_send_boundary
+  (patch requests.post at the send boundary via _capture_telegram_sends and fake LLMService/CrawlerEngine/Orchestrator):
+  a FakeOrchestrator returning one or more results with the failure counter set produces
+  exactly one sent message, and the test asserts its full text. A second test with
+  results and no failure asserts that no message is sent. Both tests must fail without
+  the src change.   (exit 2)
+
+  bash: -c: line 1: syntax error near unexpected token `(''
+
+  bash: -c: line 1: `git clone -q --no-hardlinks /src /tmp/w && git -C /tmp/w fetch
+  -q --no-tags /src ''+refs/remotes/origin/*:refs/remotes/origin/*'' && cd /tmp/w
+  && New test in tests/test_bot_service.py, following test_run_scan_sends_no_new_jobs_message_at_send_boundary
+  (patch requests.post at the send boundary via _capture_telegr'
+created: 2026-09-23T23:21:26+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0048
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Tell the user when a scan's job notifications fail to deliver instead of staying
+  silent (re-issue of planned T-0047, which never reached the backlog)
+why: G3 requires that a failure during a scan produce a message naming what failed.
+  Today src/orchestrator.py:277-283 `_notify` ignores the False that TelegramNotifier.notify_results
+  (src/notifier.py:76) returns when a send fails, and it logs and swallows any exception.
+  src/bot_service.py:315 `_run_scan` only messages the user when `results` is empty.
+  So when accepted jobs cannot be delivered, the scan ends and the user hears nothing.
+  This is the last confirmed silent-failure path in M3.
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- 'In src/orchestrator.py, `_notify` records a failure in the run''s RunReport (for
+  example `self._report.count("notify_failed")`, or a counter holding the number of
+  undelivered results) both when notify_results returns False and when it raises.
+  The existing behaviour stays: a notifier failure never raises out of Orchestrator.run.
+  `orchestrator.last_report` exposes the counter after run() returns. If a new counter
+  key is added, src/run_report.py COUNTER_LABELS gets a human label for it.'
+- 'In src/bot_service.py, `_run_scan` sends exactly one extra message through `_safe_send`
+  when results is non-empty and last_report shows a notification failure. The message
+  names the failure as Telegram job delivery, states how many jobs the scan accepted,
+  and tells the user something truthful they can act on. It must not promise an automatic
+  retry: the orchestrator saves seen URLs to the cache before notifying, so undelivered
+  jobs are not re-found. When there is no failure the behaviour is unchanged: no extra
+  message on success, and the existing no-new-jobs message when results are empty.'
+- 'New test in tests/test_agent_loop.py: with a notifier whose notify_results returns
+  False, and separately one that raises, Orchestrator.run completes and last_report
+  carries the failure counter. With a succeeding notifier the counter is absent or
+  zero.'
+- 'New test in tests/test_bot_service.py, following test_run_scan_sends_no_new_jobs_message_at_send_boundary
+  (patch requests.post at the send boundary via _capture_telegram_sends and fake LLMService/CrawlerEngine/Orchestrator):
+  a FakeOrchestrator returning one or more results with the failure counter set produces
+  exactly one sent message, and the test asserts its full text. A second test with
+  results and no failure asserts that no message is sent. Both tests must fail without
+  the src change.'
+- 'No live call: TELEGRAM_BOT_TOKEN is absent and every Telegram send in the tests
+  is patched.'
+allowed_paths:
+- src/orchestrator.py
+- src/bot_service.py
+- src/run_report.py
+- tests/test_agent_loop.py
+- tests/test_bot_service.py
+protected_paths:
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+- evals/baseline.json
+- evals/fixtures/**
+- src/prompts/**
+park_reason: "gate failures:\n  - acceptance command failed (2): In src/orchestrator.py,\
+  \ `_notify` records a failure in the run's RunReport (for example `self._report.count(\"\
+  notify_failed\")`, or a counter holding the number of undelivered results) both\
+  \ when notify_results returns False and when it raises. The existing behaviour stays:\
+  \ a notifier failure never raises out of Orchestrator.run. `orchestrator.last_report`\
+  \ exposes the counter after run() returns. If a new counter key is added, src/run_report.py\
+  \ COUNTER_LABELS gets a human label for it.\n  - acceptance command failed (127):\
+  \ In src/bot_service.py, `_"

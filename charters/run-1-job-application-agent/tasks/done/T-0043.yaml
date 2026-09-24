@@ -1,0 +1,45 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- 'Edit only the ''Kept means...'' paragraph near README.md:180-182. Change ''redirected/dead/empty/stale
+  page, no preferred location'' so the list includes the search/landing page served
+  in place of a posting (find_landing_marker). Keep the order that replay_keep in
+  evals/offline_eval.py uses: stale, then landing, then location.'
+- Do not reword, reflow or restructure anything else in the README (charter non-goal).
+  Do not touch code, tests, fixtures or baseline.json.
+- 'Offline only: no live Brave/OpenRouter calls are needed for this task.'
+created: 2026-09-23T22:50:30+0200
+max_diff_lines: 20
+timeout_min: 15
+max_turns: 20
+status: done
+id: T-0043
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: 'README: list the landing-page gate among the offline replay''s drop rules'
+why: G1's definition of done requires the README to document how the harness works.
+  T-0042 added a landing-page gate to replay_keep (evals/offline_eval.py:102, after
+  find_stale_marker), but the README paragraph at README.md:180-182 that lists the
+  replay's drop rules in production order still reads 'redirected/dead/empty/stale
+  page, no preferred location'. The documented gate list is now wrong. This is charter-allowed
+  idle work (documentation strictly within G1).
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+allowed_paths:
+- README.md
+protected_paths:
+- evals/**
+- src/**
+- tests/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: c53d325
+merged_at: 2026-09-23T22:53:23+0200

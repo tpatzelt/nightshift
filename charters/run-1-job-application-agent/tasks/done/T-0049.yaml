@@ -1,0 +1,85 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Orchestrator: in `_notify`, call `self._report.count("notify_failed")` when notify_results
+  returns False and also when it raises. The counter key must be exactly `notify_failed`,
+  because the acceptance commands check for it. A notifier failure must still never
+  raise out of Orchestrator.run. `orchestrator.last_report` exposes the counter after
+  run() returns. Add a human label for `notify_failed` to COUNTER_LABELS in src/run_report.py,
+  e.g. ''accepted jobs whose Telegram notification failed''. Note: report.save() at
+  src/orchestrator.py:244 runs before `_notify` at :248. Do not reorder these calls
+  for this task. The in-memory last_report is what the bot reads.'
+- 'Bot: in `_run_scan` (src/bot_service.py), when `results` is non-empty and `orchestrator.last_report.counters.get(''notify_failed'')`
+  is truthy, send exactly one extra message through `_safe_send`. It must say that
+  Telegram delivery of job notifications failed, give the number of jobs the scan
+  accepted (len(results)), and tell the user something true they can act on. It must
+  NOT promise an automatic retry: seen URLs are cached before notifying, so undelivered
+  jobs are not found again. Behaviour is otherwise unchanged: no extra message on
+  success, and the existing no-new-jobs message when results is empty.'
+- 'Tests in tests/test_agent_loop.py: put ''notify_failed'' in every new test''s name.
+  One test uses a notifier whose notify_results returns False and one uses a notifier
+  that raises. Both check that Orchestrator.run completes and that last_report.counters[''notify_failed'']
+  is >= 1. A third test checks that with a succeeding notifier the counter is absent
+  or zero. You may extend RecordingNotifier (see test_notifier_failure_does_not_break_run
+  at line 556) without changing how its existing tests behave.'
+- 'Tests in tests/test_bot_service.py: put ''notify_failed'' in every new test''s
+  name, following test_run_scan_sends_no_new_jobs_message_at_send_boundary (line 461).
+  Patch requests.post at the send boundary via _capture_telegram_sends and fake LLMService/CrawlerEngine/Orchestrator.
+  With a FakeOrchestrator that returns results and has notify_failed set, exactly
+  one message is sent and the test asserts its full text. With results and no failure,
+  no message is sent. Both tests must fail without the src change.'
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. TELEGRAM_BOT_TOKEN is
+  absent by design, and every Telegram send in the tests is patched. Change no LLM
+  prompt, and do not reformat existing code or tests.'
+created: 2026-09-23T23:30:58+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0049
+project: job-application-agent
+charter_goal: G3
+roadmap_ref: M3
+title: Tell the user when a scan's job notifications fail to deliver instead of staying
+  silent (re-issue of parked T-0048, with shell-runnable acceptance)
+why: 'G3 requires that an error during a scan produce a message naming what failed.
+  At HEAD fc06634, src/orchestrator.py:277-283 `_notify` ignores the False that TelegramNotifier.notify_results
+  (src/notifier.py:76) returns when a send fails, and it logs and swallows any exception.
+  src/bot_service.py:315 `_run_scan` only messages the user when `results` is empty.
+  So when accepted jobs cannot be delivered, the scan ends and the user hears nothing.
+  This is the last confirmed silent-failure path in M3. T-0048 described the same
+  work but was parked twice without a worker attempt: the gate runs every acceptance
+  entry as a shell command, and its prose acceptance entries failed as bash. This
+  re-issue keeps acceptance to commands only and moves the behaviour spec into notes.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run pytest -q tests/test_agent_loop.py -k notify_failed
+- uv run pytest -q tests/test_bot_service.py -k notify_failed
+- grep -q notify_failed src/run_report.py
+- grep -q notify_failed src/orchestrator.py
+- grep -q notify_failed src/bot_service.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+allowed_paths:
+- src/orchestrator.py
+- src/bot_service.py
+- src/run_report.py
+- tests/test_agent_loop.py
+- tests/test_bot_service.py
+protected_paths:
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+- evals/**
+- src/prompts/**
+- src/llm_service.py
+- src/notifier.py
+- src/telegram_api.py
+- src/url_heuristics.py
+- src/page_signals.py
+merged_sha: 5897e9f
+merged_at: 2026-09-23T23:36:56+0200

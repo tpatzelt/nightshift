@@ -1,0 +1,61 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Read src/bot_service.py:_format_missing_profile_message first. Assert the full string
+  with == for cv-only, prefs-only and both. Do this in the three _format_missing_profile_message
+  tests (tests/test_bot_service.py:793-811) and in the three _run_scan send-boundary
+  tests (tests/test_bot_service.py:708-768) on sent[0]['text'].
+- Copy the expected strings from the current src output, including the leading '⚠️
+  ' and the ' - ' separator. Do not edit src/ to fit the tests. If the source text
+  looks wrong, report it in a followup instead.
+- Keep the existing test names and structure. Replace or add assertions; do not reformat
+  other tests.
+- 'Offline only: requests.post is already patched through _capture_telegram_sends.
+  Make no live Telegram, Brave or OpenRouter call.'
+- "attempt 1: gate failures:\n  - acceptance command failed (1): grep -qF 'missing\
+  \ your CV and your job preferences. Send /start (or /reset) to finish setup.' tests/test_bot_service.py"
+- 'attempt 1 gate output:
+
+  $ grep -qF ''missing your CV and your job preferences. Send /start (or /reset) to
+  finish setup.'' tests/test_bot_service.py   (exit 1)
+
+  (no output)'
+created: 2026-09-24T04:40:01+0200
+max_diff_lines: 120
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0060
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the exact text of the missing-profile 'Scan did not run' message for
+  all three cases (re-issue of planned T-0059, which never reached the backlog)
+why: G3's definition of done needs a test asserting the content of every user-visible
+  message path. The missing-profile scan message (src/bot_service.py:63-75, sent at
+  src/bot_service.py:309) is the one path whose tests still check only substrings.
+  tests/test_bot_service.py:708-811 check things like 'CV' in text and '/start' in
+  text. A wording regression, such as a dropped ' and ', a lost '/reset' hint or a
+  changed '⚠️ Scan did not run' prefix, would pass unnoticed. This is tests-only idle
+  work strictly within G3.
+acceptance:
+- uv run pytest -q
+- grep -qF 'missing your CV and your job preferences. Send /start (or /reset) to finish
+  setup.' tests/test_bot_service.py
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- run_mock_test.py
+- .github/**
+- CLAUDE.md
+merged_sha: 65c3351
+merged_at: 2026-09-24T04:46:17+0200

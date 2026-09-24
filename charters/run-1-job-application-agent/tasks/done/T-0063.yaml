@@ -1,0 +1,61 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Tests only. Add one test named test_committed_corpus_totals_are_pinned to tests/test_offline_baseline.py.
+  It calls run(DEFAULT_CORPUS_DIR) and asserts totals['records'] == 58, totals['kept']
+  == 16, and every one of the five metrics in METRICS (import from evals.offline_eval)
+  == 1.0 (use pytest.approx). On failure the assertion message must name the metric,
+  for example with one assert per metric in a loop over METRICS and f'{name} regressed'.
+- Add a short comment or docstring saying these are the scores G2 achieved, and that
+  a change which legitimately extends evals/fixtures/** must update the pinned numbers
+  in the same diff.
+- Do not edit evals/baseline.json. It is the arming reference that G2 is measured
+  against, and it stays as it is.
+- Do not edit src/ or evals/ to make the test pass. If the totals differ from the
+  ones above, stop and report the actual totals in a followup instead of pinning different
+  numbers.
+- Offline only. Make no live Brave, OpenRouter or Telegram call.
+created: 2026-09-24T08:24:50+0200
+max_diff_lines: 60
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0063
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Pin the achieved corpus totals in a test so a regression that still beats the
+  arming baseline fails the default suite (re-issue of planned T-0062, which never
+  reached the backlog)
+why: 'G2''s definition of done requires that no metric regresses. Today the only guard
+  is `--check-baseline` against evals/baseline.json, which holds the weak arming numbers
+  (posting_shape 0.815, aggregator_drop 0.765, location 1.0, staleness 0.429, dedup
+  0.571). A change to src/url_heuristics.py, src/page_signals.py or the triage/dedup
+  paths could therefore drop posting_shape_rate from 1.000 to 0.85 and every gate
+  would stay green. I verified on a scratch copy at HEAD 638ad58 that `run(DEFAULT_CORPUS_DIR)[''totals'']`
+  is {''records'': 58, ''kept'': 16, ''metrics'': {''posting_shape_rate'': 1.0, ''aggregator_drop_rate'':
+  1.0, ''location_match_rate'': 1.0, ''staleness_detection_rate'': 1.0, ''dedup_rate'':
+  1.0}}. I also checked that no test in tests/ asserts these achieved values: tests/test_offline_baseline.py
+  only compares against the baseline file or against inflated copies of the current
+  totals. `uv run pytest -q` gives 383 passed, 1 skipped. This is test-only idle work
+  strictly within G1/G2.'
+acceptance:
+- uv run pytest -q
+- grep -q 'def test_committed_corpus_totals_are_pinned' tests/test_offline_baseline.py
+- uv run python -m evals.offline_eval --check-baseline
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_offline_baseline.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 2046f15
+merged_at: 2026-09-24T08:27:56+0200

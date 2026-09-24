@@ -1,0 +1,62 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Tests only. Add one test named test_notify_message_exact_text_with_company_and_fallback_reason
+  to tests/test_notifier.py. Reuse the file's _Response helper and its monkeypatch
+  of requests.post. Build the two JobResult objects inline, because _result() hard-codes
+  company='Unknown'.
+- Use no ledger_path, as in the existing tests. Assert that notify_results returns
+  True, that exactly one message was sent, and that payload['text'] equals the exact
+  string quoted in 'why'. Write the header with the escape \U0001f4bc so it matches
+  src/notifier.py.
+- Do not edit src/. If the observed text differs from the string in 'why', stop and
+  report it in a followup. Do not change the code, and do not weaken the assertion
+  to substrings.
+- Offline only. Make no live Brave, OpenRouter or Telegram call.
+created: 2026-09-24T08:48:30+0200
+max_diff_lines: 60
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0065
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the exact full text of a job notification message, including the ' @
+  company' suffix and the entry layout
+why: 'G3''s definition of done requires that every user-visible message path has a
+  test asserting its content. The job notification is the main message the bot sends,
+  but tests/test_notifier.py and tests/test_notify_ledger.py only check it with substring
+  checks (''2 new job(s)'', ''Score: 85'', the URL, the ''Why:'' line). I grepped
+  tests/ for '' @ '' and for the 💼 header: no test covers the company suffix that
+  TelegramNotifier._format_result adds when company != ''Unknown'', and no test pins
+  the order of the lines or the blank line between entries. Every test helper uses
+  company=''Unknown''. I ran this on a scratch copy at HEAD 5c1055a with requests.post
+  patched: notify_results([JobResult(title=''Software Engineer'', company=''Acme'',
+  url=''https://x.io/1'', score=85, reason=''good match'', status=''new''), JobResult(title=''Data
+  Engineer'', company=''Unknown'', url=''https://x.io/2'', score=70, reason='''',
+  status=''new'')]) sends exactly one message, whose text is ''\U0001f4bc 2 new job(s)
+  found:\n\n1. Software Engineer @ Acme\nScore: 85\nWhy: good match\nhttps://x.io/1\n\n2.
+  Data Engineer\nScore: 70\nWhy: scored 70; the evaluator gave no explanation\nhttps://x.io/2''.
+  The current behaviour is correct, but nothing pins it. Tests only, strictly within
+  G3. At this HEAD, pytest gives 385 passed and 1 skipped, and offline_eval scores
+  1.000 on every metric.'
+acceptance:
+- uv run pytest -q
+- grep -q 'def test_notify_message_exact_text_with_company_and_fallback_reason' tests/test_notifier.py
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_notifier.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: baf983e
+merged_at: 2026-09-24T08:51:03+0200

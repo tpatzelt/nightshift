@@ -1,0 +1,53 @@
+depends_on:
+- T-0003
+new_tests_required: true
+attempts: 0
+notes:
+- 'src/** and evals/fixtures/** are protected here so the frozen numbers provably
+  describe unmodified logic on the agreed corpus. Generate evals/baseline.json by
+  running the harness as-is and committing its totals verbatim - do not hand-edit
+  the values. Add --check-baseline: recompute, compare each metric against evals/baseline.json,
+  print a before/after/delta column, exit 0 when every metric is >= baseline (within
+  a stated float tolerance, e.g. 1e-9), exit 1 naming each metric that dropped. Tests
+  must cover both branches with a stub baseline file: one regressed metric exits non-zero
+  and names that metric; all-equal exits zero. If the checked-in baseline already
+  scores 1.0 on posting_shape_rate or aggregator_drop_rate, the corpus is too easy
+  for G2 to show improvement - do not weaken the metric; report a followup saying
+  the corpus needs harder records.'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0004
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Freeze the arming baseline and add --check-baseline regression gate
+why: G2 is defined as beating 'the baseline recorded at arming', so the baseline must
+  be captured from unmodified src/ before any quality change, and every later task
+  needs a single command that fails on a regression.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_offline_baseline.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/baseline.json
+- evals/offline_eval.py
+- tests/test_offline_baseline.py
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/checks.py
+- evals/corpus.py
+- evals/fixtures/**
+- tests/test_offline_eval.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: e804a4b
+merged_at: 2026-09-22T22:24:34+0200

@@ -1,0 +1,68 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- 'Edit only the ''Telegram notifications'' section (README.md:103-108). Change ''(title,
+  score, URL)'' so it says each job also gets a ''Why:'' line explaining the match,
+  with an honest fallback when the evaluator gave no reason. Add at most a short paragraph
+  or bullet list covering three things. (a) Postings already notified are recorded
+  by canonical URL in `notified.json`, next to the seen-URL cache (for the bot: under
+  the user''s data/users/<chat_id>/ directory), and are never sent again. A URL is
+  recorded only after its message sends successfully. (b) If a bot scan fails, the
+  user gets a warning that names the exception and cause, with secrets scrubbed. (c)
+  If Telegram delivery of a scan''s job notifications fails, the user is told how
+  many jobs were accepted and that they will not be resent automatically. Read src/notifier.py,
+  src/bot_service.py and src/main.py so every sentence matches the code. Do not describe
+  behaviour that does not exist.'
+- Do not reword, reflow or restructure anything else in the README (charter non-goal).
+  In particular, leave the bot onboarding list at README.md:28-41 alone. Its 'scan_interval_hours
+  (default 6)' sentence looks stale next to config_manager's bot_scan_hour, but no
+  G1-G3 task covers scheduling.
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. TELEGRAM_BOT_TOKEN is
+  absent by design. Touch no code, tests, fixtures or baseline.json.'
+created: 2026-09-23T23:38:50+0200
+max_diff_lines: 40
+timeout_min: 15
+max_turns: 20
+status: done
+id: T-0050
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: 'README: describe what a job notification now says, that it is never repeated,
+  and what the user is told when delivery or a scan fails'
+why: 'This is idle work the charter allows: documentation strictly within G3. The
+  planner checked on 2026-09-23. All three definitions of done are met. `uv run python
+  -m evals.offline_eval --check-baseline` exits 0 with every TOTAL metric at 1.000
+  against the arming baseline (posting_shape 0.815, aggregator_drop 0.765, staleness
+  0.429, dedup 0.571), and nothing regressed. `uv run pytest -q` gives 362 passed,
+  1 skipped. run_mock_test.py passes. But the user-facing README section ''Telegram
+  notifications'' (README.md:103-108) still describes the pre-G3 output: it says every
+  run sends ''the newly accepted jobs (title, score, URL)''. It does not mention three
+  things. (1) Each entry carries a ''Why:'' line, with a fallback when the evaluator
+  gave no reason (T-0046, src/notifier.py _format_result). (2) A durable ledger `notified.json`,
+  stored next to the seen-URL cache, means a posting is never notified twice, including
+  across restarts and within one results list (T-0024, T-0035; src/main.py:47, src/bot_service.py
+  _run_scan). (3) The bot sends a warning naming the failure when a scan raises (_format_scan_error),
+  and a message when Telegram delivery of job notifications fails (notify_failed,
+  T-0049). Operators reading the README cannot learn any of this today.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+- grep -q 'notified.json' README.md
+- grep -q 'Why:' README.md
+allowed_paths:
+- README.md
+protected_paths:
+- evals/**
+- src/**
+- tests/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: cac026c
+merged_at: 2026-09-23T23:42:15+0200

@@ -1,0 +1,88 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- Tests only. src/** is protected. If a path cannot be asserted without a source change,
+  leave it and report a followup naming the path and the change it needs. Do not reach
+  into src.
+- 'In every test below, ''at the send boundary'' means monkeypatching requests.post
+  in the src.telegram_api module and asserting on the `text` field of the JSON payload
+  Telegram would have received. Do not replace svc._telegram.send_message or _safe_send:
+  that is exactly the gap the reviewer flagged on T-0025.'
+- 'Checklist. The task output must map each item to the test name that asserts it.
+  (a) Intake replies through BotService._dispatch (src/bot_service.py:177): /start,
+  /status in both branches, /help, /reset, CV paste. (b) All three _handle_run_command
+  replies (:186): setup-not-finished, scan-queued, already-queued. (c) The no-new-jobs
+  message (:316) with each of the four _empty_scan_explanation branches (:33). (d)
+  The scan-error message from _scan_worker (:249-260) at the send boundary. Assert
+  the exception type name and cause appear, and that a bot-token path (/bot<token>/)
+  and a URL query string (?key=...) raised inside the scan appear in no payload text:
+  this exercises _scrub_secrets (:65) end to end. (e) The dispatch-failure reply from
+  BotService.run (:171), ''⚠️ Something went wrong handling that message'', driven
+  by a get_updates stub that returns one update whose dispatch raises, with _stop.is_set
+  stubbed to end the loop after one pass the way tests/test_bot_service.py:124 already
+  does. The test must not sleep for real. (f) TelegramClient._split_message (src/telegram_api.py:105)
+  just under, exactly at and well over MAX_MESSAGE_CHARS: every chunk stays within
+  the limit, and ''\n''.join(chunks) reproduces the input.'
+- The existing test at tests/test_bot_service.py:114 may be kept or strengthened,
+  but must not be weakened or deleted.
+- No live Telegram call and no network of any kind. The suite must stay deterministic
+  and must not depend on TELEGRAM_BOT_TOKEN, which is deliberately absent from the
+  sandbox. Do not add it.
+- 'attempt 1: reviewer said revise: Most of this is good. Only the two allowed test
+  files changed. All tests assert at the real send boundary by monkeypatching src.telegram_api.requests.post,
+  and none replaces send_message or _safe_send. There is no network and no sleep,
+  and the existing test at tests/test_bot_service.py:114 is untouched. Checklist items
+  (a), (b), (c), (e) and (f) are covered, and the tests would fail if the behaviour
+  were reverted. Three things need fixing:
+
+  1. Item (d) says to ''Assert the exception type name and cause appear''. test_scan_worker_sends_error_at_send_boundary_with_secrets_scru'
+- "attempt 2: gate failures:\n  - worker reported status=None, not 'done'"
+created: 2026-09-23T17:11:11+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0031
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the content of every remaining user-visible message path, including
+  scan-error and dispatch-failure text at the send boundary (supersedes parked T-0025)
+why: 'G3 is the only goal left open. I replayed a scratch copy of today''s tree: `python
+  -m evals.offline_eval --check-baseline` exits 0 and beats the arming baseline on
+  all but one metric, which holds (posting_shape 0.815->0.889, aggregator_drop 0.765->0.882,
+  location 1.000->1.000, staleness 0.429->1.000, dedup 0.571->1.000), and `uv run
+  pytest -q` gives 319 passed, 1 skipped. So G1 and G2 are met, and T-0024 (never
+  notify twice) and T-0016 (a failed scan says what failed) are merged. G3''s last
+  definition-of-done item is ''every user-visible message path has a test asserting
+  its content''. Parked T-0025 got most of the way twice. Both times the reviewer
+  approved the /start, /status, /help, /reset, CV-paste, /run and no-new-jobs assertions
+  and the _split_message assertions, then sent it back because one explicitly listed
+  path was still unasserted. The recorded reason is cut off before it names that path.
+  Two paths in the tree are still asserted only below the send boundary or not at
+  all. First, the scan-error text: tests/test_bot_service.py:114 swaps out svc._telegram.send_message
+  instead of requests.post and never checks that secrets are scrubbed on the wire.
+  Second, the dispatch-failure reply in BotService.run (src/bot_service.py:171) has
+  no test at all. This task closes both and keeps T-0025''s accepted work.'
+acceptance:
+- uv run pytest -q tests/test_bot_service.py tests/test_telegram_api.py tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+- tests/test_telegram_api.py
+- tests/test_notifier.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_run_quality.py
+- tests/test_notify_ledger.py
+- tests/test_intake.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+park_reason: "gate failures:\n  - worker reported status=None, not 'done'"

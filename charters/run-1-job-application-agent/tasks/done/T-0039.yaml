@@ -1,0 +1,80 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- 'Add a stdlib-only function find_landing_marker(text: str) -> str | None to src/page_signals.py,
+  next to find_stale_marker (line 112) and in the same style: a module-level tuple
+  of normalised phrases, matched after _normalize. Return the phrase that matched,
+  or None.'
+- Build the phrases from generic search-form and landing boilerplate in German and
+  English, for example phrases like 'suchvorschläge und letzte suchanfragen', 'suche
+  nach berufsbezeichnung', 'search by job title or keyword'. Do not match on the WhatJobs
+  host name, and do not copy the record's whole text as one phrase. A single phrase
+  that appears in a normal posting's footer is not enough. If you are unsure, require
+  two distinct phrases.
+- 'Tests in tests/test_page_signals.py: (1) a positive test using the line-5 landing
+  text; (2) a test that loads every record labelled kind=posting from evals/fixtures/*.jsonl,
+  using json and pathlib only, and asserts find_landing_marker returns None for each;
+  (3) at least one hand-written English posting text that mentions ''search'' in passing
+  and must not match.'
+- Do not call the function from anywhere yet. T-0040 does that. Do not edit fixtures,
+  the baseline, or src/url_heuristics.py.
+- Offline only, no new dependencies, no live calls. The record is already captured.
+- 'attempt 1: reviewer said revise: The diff touches only the two allowed files, adds
+  nothing new to the pipeline, keeps the function unwired, and has no dependencies
+  or secrets. I checked the positive test text against evals/fixtures/project-manager-berlin.jsonl
+  line 5 and it matches exactly. Six of the 12 phrases match that record. No other
+  fixture record of any kind matches any phrase. The reason for revising is that the
+  two-phrase threshold has no test. The docstring and the task notes both treat that
+  threshold as the protection against false positives. Yet if `len(matched) >= 2`
+  is changed to `>= 1`, e'
+created: 2026-09-23T22:20:32+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0039
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Add a page signal that recognises a search/home landing page served in place
+  of a posting (first slice of parked T-0038)
+why: 'T-0038 was parked after two attempts that both ended with status=None. There
+  was no gate or test failure, so the likely cause is that the worker ran out of time
+  or turns on a task touching five files. This slice is only the detector and its
+  tests. Wiring it into the pipeline is T-0040. Evidence, verified on 2026-09-23 by
+  replaying HEAD 8f821e6 offline: the TOTAL row is posting_shape_rate 0.941 and aggregator_drop_rate
+  0.941 (arming baseline 0.815 and 0.765), and every other metric is 1.000. Both misses
+  come from one record, evals/fixtures/project-manager-berlin.jsonl line 5 (https://de.whatjobs.com/jobs?id=261276305).
+  It returns HTTP 200, its title is ''Jobs in Deutschland? | WhatJobs Deutschland'',
+  and its body is only site navigation and search-form text. It is labelled kind=index.
+  The URL shape /jobs?id=<n> is a real posting shape (tests/test_url_heuristics.py:208),
+  so the only evidence that this page is not a posting is in the page text.'
+acceptance:
+- uv run pytest -q tests/test_page_signals.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/page_signals.py
+- tests/test_page_signals.py
+protected_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- evals/metrics.py
+- evals/corpus.py
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+- tests/test_eval_corpus.py
+- tests/test_offline_baseline.py
+- tests/test_run_quality.py
+- src/notifier.py
+- src/bot_service.py
+- src/telegram_api.py
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: b7f718e
+merged_at: 2026-09-23T22:28:42+0200

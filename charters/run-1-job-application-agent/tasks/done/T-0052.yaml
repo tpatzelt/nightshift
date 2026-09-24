@@ -1,0 +1,76 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Bot: in `_run_scan` (src/bot_service.py), change the branch where the CV text is
+  empty or record.preferences is falsy. Before returning, set `record.last_scan_at
+  = time.time()` and `self._store.save(record)`, the same pattern used at :286-287,
+  so the scheduler does not re-queue this user every minute. Then send exactly one
+  message through `self._safe_send(chat_id, ...)`. The message must say the scan did
+  not run, name what is missing (the CV, the preferences, or both), and tell the user
+  to send /start (or /reset) to finish or redo setup. Keep the existing log line.
+  Nothing else changes: do not construct LLMService, CrawlerEngine or Orchestrator
+  on this path.'
+- 'Tests in tests/test_bot_service.py: put ''missing_profile'' in every new test''s
+  name. Follow test_run_scan_sends_no_new_jobs_message_at_send_boundary: use _capture_telegram_sends(monkeypatch),
+  _service(tmp_path), and an active record. Monkeypatch LLMService, CrawlerEngine
+  and Orchestrator with fakes that fail the test if constructed. Cover three cases:
+  (a) CV missing, preferences set; (b) CV present, preferences empty; (c) both missing.
+  Each must send exactly one message, and the test asserts that its text names what
+  is missing and mentions /start. One test asserts that record.last_scan_at is non-zero
+  after the call, so `svc._is_due(record.last_scan_at, time.time())` is False once
+  the scan hour has passed. Every new test must fail against the current code.'
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. TELEGRAM_BOT_TOKEN is
+  absent by design, and every Telegram send in the tests is patched. Change no LLM
+  prompt, and do not reformat existing code or tests.'
+- 'The id is T-0052, not T-0051: several earlier planner decisions used T-0051 for
+  different tasks that never landed. Do not reuse that id.'
+created: 2026-09-24T03:09:06+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0052
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Tell an active user whose CV or preferences are missing why their scan did
+  not run, and stop the scheduler re-queuing them every minute (re-issue of planned
+  T-0051, which never reached the backlog)
+why: G3 requires that an error during a scan produce a message naming what failed.
+  At HEAD cac026c, src/bot_service.py:280-282 `_run_scan` returns early with only
+  a log line when the user's record is active but `load_document(chat_id, 'cv')` is
+  empty or `record.preferences` is falsy. /run (src/bot_service.py:194-199) has already
+  told the user 'Scanning for jobs now - I'll message you with anything I find', and
+  after that no message ever arrives. The early return also skips the `record.last_scan_at
+  = time.time()` write at :286, so once the scan hour has passed, `_scheduler` (:232-247)
+  finds the user due again and re-queues the same skipped scan every 60 s. This is
+  the last silent scan-failure path found in M3. Three planner passes proposed it
+  as T-0051, and it never landed in the backlog.
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run pytest -q tests/test_bot_service.py -k missing_profile
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+allowed_paths:
+- src/bot_service.py
+- tests/test_bot_service.py
+protected_paths:
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+- evals/**
+- src/prompts/**
+- src/llm_service.py
+- src/notifier.py
+- src/telegram_api.py
+- src/url_heuristics.py
+- src/page_signals.py
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/user_store.py
+merged_sha: 9fd170c
+merged_at: 2026-09-24T03:13:50+0200

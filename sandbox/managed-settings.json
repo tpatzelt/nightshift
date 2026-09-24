@@ -1,0 +1,55 @@
+{
+  "$comment": "NIGHTSHIFT managed policy. Installed root-owned at /etc/claude-code/managed-settings.json, which agents cannot override from project or user settings.",
+  "permissions": {
+    "deny": [
+      "Bash(curl:*)",
+      "Bash(wget:*)",
+      "Bash(ssh:*)",
+      "Bash(scp:*)",
+      "Bash(sftp:*)",
+      "Bash(nc:*)",
+      "Bash(ncat:*)",
+      "Bash(socat:*)",
+      "Bash(telnet:*)",
+      "Bash(rsync:*)",
+      "Bash(sudo:*)",
+      "Bash(su:*)",
+      "Bash(docker:*)",
+      "Bash(podman:*)",
+      "Bash(mount:*)",
+      "Bash(umount:*)",
+      "Bash(nsenter:*)",
+      "Bash(unshare:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(git config --global:*)",
+      "Read(**/.env*)",
+      "Read(/secrets/**)",
+      "Read(/etc/claude-code/**)",
+      "Read(**/.claude/**)",
+      "Read(**/.claude.json)",
+      "Edit(/etc/**)",
+      "Write(/etc/**)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit|Read",
+        "hooks": [
+          { "type": "command", "command": "python3 /opt/guard/guard.py", "timeout": 10 }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1"
+  },
+  "includeCoAuthoredBy": false,
+  "cleanupPeriodDays": 1
+}

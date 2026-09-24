@@ -1,0 +1,77 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add human labels to COUNTER_LABELS in src/run_report.py for error_query_generation_failed,
+  error_fetch_failed and error_evaluate_failed. Suggested labels: ''search-query generation
+  failed (LLM error)'', ''page fetches failed'', ''LLM scoring failed''. Put them
+  after the existing keys and do not reorder or rename existing ones. src/dashboard.py:139
+  already uses COUNTER_LABELS.get, so it picks the labels up without changes.'
+- 'In _empty_scan_explanation, when any counter starting with ''error_'' is non-zero,
+  add one sentence naming each failure with its count and label, e.g. '' Errors: 1
+  search-query generation failed (LLM error).'' Show counts and labels only. Never
+  include the exception text: it can carry URLs or other data, and this message goes
+  to real users.'
+- When no error_ counter is set, the output must stay byte-for-byte the same in all
+  four existing branches. tests/test_bot_service.py:431-465 and tests/test_run_quality.py:205-222
+  assert those strings, and they must pass unchanged.
+- New tests in tests/test_bot_service.py must assert the whole returned string for
+  (a) a report with only error_query_generation_failed=1 and nothing fetched, and
+  (b) a report with pages_fetched and error_fetch_failed both set. At least one test
+  must go through _run_scan's no-new-jobs message at the patched send boundary, the
+  same way the existing T-0033 tests do.
+- 'Offline only: make no live Brave, OpenRouter or Telegram calls. Do not reformat
+  or rename existing code or tests.'
+created: 2026-09-24T04:21:15+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0056
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Name the failures in the 'no new matching jobs' message when the scan's RunReport
+  recorded errors
+why: 'Verified at read-only HEAD 7e87c91. RunReport.record_error (src/run_report.py:61)
+  counts failures as `error_<kind>` counters: error_query_generation_failed (src/orchestrator.py:156),
+  error_fetch_failed (:431) and error_evaluate_failed (:482). _empty_scan_explanation
+  (src/bot_service.py:33-54) only reads counters that start with `skipped_` or `rejected_`,
+  so it ignores all of these. If OpenRouter fails during query generation, nothing
+  is searched or fetched, and the user is told ''Scan finished - no new matching jobs
+  this time... I could not fetch any job pages this run.'' That message says nothing
+  about the LLM failure. If every fetch raises, the user is told ''I could not fetch
+  any job pages'' with no cause. The G3 definition of done says ''an error during
+  a scan produces a message naming what failed'', and these swallowed errors never
+  reach the scan-error path (_format_scan_error), because the orchestrator catches
+  them.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+- grep -q 'error_query_generation_failed' src/run_report.py
+- grep -q 'error_fetch_failed' src/run_report.py
+- grep -q 'error_evaluate_failed' src/run_report.py
+- grep -q 'error_query_generation_failed' tests/test_bot_service.py
+allowed_paths:
+- src/bot_service.py
+- src/run_report.py
+- tests/test_bot_service.py
+- tests/test_run_quality.py
+protected_paths:
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/url_heuristics.py
+- src/page_signals.py
+- src/notifier.py
+- src/telegram_api.py
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 18c2cf5
+merged_at: 2026-09-24T04:25:42+0200

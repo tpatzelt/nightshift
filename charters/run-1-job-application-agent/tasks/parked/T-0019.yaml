@@ -1,0 +1,93 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- Change replay_keep so a record survives only if classify_url(canonical_url(url))
+  == POSTING. Keep the existing drop order and every existing reason exactly as it
+  is (dedup by canonical URL first, then OTHER, then aggregator INDEX, then redirected_off_posting,
+  http_status >= 400, empty text, find_stale_marker, location) and add the posting-kind
+  gate as one more step, so each drop stays attributable to a named rule and staleness_detection_rate/aggregator_drop_rate
+  keep measuring what they measure today. Do not touch evals/metrics.py — the metric
+  definitions are not what changes here, only which records are declared 'kept'.
+- 'Record the semantic change where a reader will find it: the evals/offline_eval.py
+  module docstring (which currently says kept is ''what would reach LLM scoring'')
+  and the README metrics section. State the assumption explicitly, since nobody can
+  be asked: a LISTING page from which no posting links can be harvested IS scored
+  directly in production, and this harness counts it as dropped; corpus records carry
+  no links field, so the harvest branch cannot be replayed, and modelling hub pages
+  as never-reported is the conservative reading that matches the common path.'
+- 'Re-freeze the baseline with the T-0018 tool, never from the current tree: `uv run
+  python -m evals.rebaseline --corpus evals/fixtures --out evals/baseline.json`. The
+  tool copies the CURRENT evals/ package next to the ARMING revision''s src/, so the
+  new semantics apply to both sides of the comparison and no improvement is erased
+  or invented. Quote the arming-vs-current delta table in the task output.'
+- tests/test_rebaseline.py currently hard-codes the arming totals (records 23, kept
+  12, posting_shape_rate 0.750, ...), which this change and the corpus growth in T-0020
+  both invalidate. Replace guarantee (a) with an assertion that the arming replay
+  reproduces the committed evals/baseline.json totals exactly (read the file, compare
+  key for key) so it stays true across re-freezes, and leave the other five T-0018
+  guarantees intact — in particular keep the non-tautological old-src discriminator
+  asserting the exported src/url_heuristics.py contains 'devjobs.de' and not 'stellenanzeigen.de'
+  while the working tree's contains both.
+- 'New tests that fail without the change: a record whose URL classifies LISTING (https://acme.example/careers)
+  is absent from replay_keep''s output while an ATS posting URL on the same profile
+  is present; a non-aggregator INDEX-shaped URL is likewise absent; and the MIXED_CORPUS
+  expectations in tests/test_offline_eval.py are updated to the new kept set with
+  the comment explaining why each record survives or not kept accurate.'
+- No new dependency, no network, no live API call, no key in any file or log. `uv
+  run pytest -q` must stay green.
+- "attempt 1: gate failures:\n  - tests/test_offline_baseline.py is outside allowed_paths"
+- "attempt 2: gate failures:\n  - worker reported status='blocked', not 'done'"
+created: 2026-09-23T08:22:05+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0019
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: 'Score results, not hub pages: make the harness sensitive to posting-vs-listing'
+why: 'evals/offline_eval.py:60 replay_keep drops only OTHER URLs and aggregator INDEX
+  pages, so a page classified LISTING (or non-aggregator INDEX) counts as kept. Production
+  does the opposite: src/orchestrator.py:406 harvests posting links out of any non-POSTING
+  page and returns without scoring it, so a careers/board hub never becomes a JobResult.
+  Consequence, which I verified by replaying evals/fixtures against the current tree:
+  reclassifying a vendor board root from POSTING to LISTING changes no metric whatsoever,
+  because the record stays in kept either way. posting_shape_rate is one of the two
+  metrics G2''s definition of done names as must-improve, so until kept models ''what
+  becomes a reported result'', T-0021 and T-0022 are arithmetically unable to move
+  it and a worker would be pushed toward gaming the number. Measured today: kept 12
+  -> 9 under posting-only semantics, posting_shape_rate 0.750 -> 1.000, other four
+  metrics unchanged; the three records that leave are correctly-classified careers
+  pages (dataforge/pixelforge/exampleai .example/careers).'
+acceptance:
+- uv run python -m evals.offline_eval
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_offline_eval.py tests/test_rebaseline.py tests/test_offline_baseline.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/offline_eval.py
+- evals/baseline.json
+- tests/test_offline_eval.py
+- tests/test_rebaseline.py
+- README.md
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/rebaseline.py
+- evals/profiles.py
+- evals/fixtures/**
+- tests/test_offline_metrics.py
+- tests/test_eval_corpus.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 0
+park_reason: "gate failures:\n  - worker reported status='blocked', not 'done'"

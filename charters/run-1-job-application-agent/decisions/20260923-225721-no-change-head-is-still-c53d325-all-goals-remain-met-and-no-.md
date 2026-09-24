@@ -1,0 +1,12 @@
+# No change: HEAD is still c53d325, all goals remain met, and no work is scheduled
+
+_Recorded 20260923-225721 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty and there are no worker followups. HEAD of /repo/job-application-agent is still c53d325 (T-0043). /repo is read-only, so I ran the checks on a copy in /tmp/ja. `uv run python -m evals.offline_eval` exited 0, printed the per-metric table and wrote evals/runs/offline/report.json. The TOTAL row scored 1.000 on all five metrics over 58 records, 16 of them kept. The arming baseline in evals/baseline.json, revision b6da8dd, is posting_shape 0.815, aggregator_drop 0.765, location_match 1.000, staleness 0.429 and dedup 0.571. `--check-baseline` exited 0. `uv run pytest -q` gave 347 passed and 1 skipped. `uv run python run_mock_test.py` exited 0. For G3, job messages include a 'Why:' line (src/notifier.py _format_result). Repeat notifications are blocked by the durable ledger, which both src/main.py:47 and src/bot_service.py use, and by the per-call dedup. The texts for scan errors, dispatch failures, intake, /run and no-new-jobs, and the message chunking, are all asserted at the Telegram send boundary (T-0032 to T-0035). Every parked task has been superseded by a re-issue that has since merged.
+
+## Decision
+Add no tasks, revive no parked tasks and add no milestones. Assumptions, recorded because the human cannot be asked: (1) All three goals meet their definition of done on the current tree, which I re-verified on this pass. (2) The charter allows idle work but does not require it. There is no followup, no new corpus evidence and no user-visible message path I found without a content assertion, so speculative tests or refactors would only add churn. (3) I made no live Brave or OpenRouter calls. They cost real money and are not needed to confirm goals that are already met. (4) No op can change a milestone's status, so the roadmap still shows M1 to M3 as 'planned'. I left it as it is rather than add duplicate milestones.
+
+## Consequences
+Workers stay idle. The merge gates and live-API spend are not affected. A future pass should schedule work only when new evidence arrives: a worker followup, new recorded runs or fixtures that show a miss, a commit that changes the metrics or the test count, or a message path found to have no content assertion. Any such work must stay within the charter's allowed idle work.

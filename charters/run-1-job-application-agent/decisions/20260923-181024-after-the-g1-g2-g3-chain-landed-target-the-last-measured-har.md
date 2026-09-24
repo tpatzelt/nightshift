@@ -1,0 +1,12 @@
+# After the G1/G2/G3 chain landed, target the last measured harness miss with a page-level search-landing signal
+
+_Recorded 20260923-181024 by the NIGHTSHIFT planner._
+
+## Context
+The backlog was empty and every task on the re-issued chain is merged (T-0024 to T-0036). I replayed the corpus on the current tree (read-only, output to /tmp). Against the frozen baseline (0.815/0.765/1.000/0.429/0.571) the harness reports posting_shape 0.941, aggregator_drop 0.941, location 1.000, staleness 1.000 and dedup 1.000. --check-baseline reports no regression, so the G1 and G2 definitions of done look met. The only remaining miss is de.whatjobs.com/jobs?id=261276305: the URL is a real posting shape, but the page is WhatJobs' search landing page, which caps both headline G2 metrics. G3 work (why-matched text, the notify-once ledger, in-batch dedup, scan-failure text, send-boundary assertions for intake, /run, empty-scan, error and chunking paths) is merged via T-0010, T-0016, T-0024 and T-0032 to T-0035, and the workers left no followups.
+
+## Decision
+Add one small G2 task, T-0037. It adds a two-phrase-minimum search-landing page signal in src/page_signals.py and applies it in the production scoring gate and in the harness replay. It does not change URL classification, because the URL shape is correct and pinned by tests. Parked T-0031 and the other parked items stay parked: their work landed as slices or re-issues, and reviving them would duplicate it. No new milestone is added. Assumptions: the task schema accepts id/title/charter_goal/milestone/project/depends_on/allowed_paths/max_diff_lines/description/acceptance. evals/baseline.json is not re-frozen, because the charter measures improvement against the arming baseline. Requiring two distinct phrases is the conservative way to avoid dropping real postings.
+
+## Consequences
+If T-0037 lands, every cell of the G1 table is 1.000 on the current corpus, and further G2 gains can only be measured by adding labelled records. Once it merges, the next planner pass should schedule only the charter's allowed idle work (tests, docs, small refactors within G1 to G3). The new skipped_search_landing counter also shows up in the empty-scan explanation, which helps G3's goal of actionable text. The risk of dropping real postings is limited by the two-phrase threshold and by a test that runs every labelled posting in the corpus through the new signal.

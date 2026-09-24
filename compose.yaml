@@ -1,0 +1,77 @@
+# NIGHTSHIFT — one Compose project, every resource prefixed "nightshift-".
+# Teardown: docker compose -p nightshift down -v && rm -rf ~/nightshift
+name: nightshift
+
+services:
+  # Inner Docker daemon. Agent containers, the jail network and the egress proxy
+  # all live in here, so orchestrator cleanup can never touch Tim's real daemon.
+  dind:
+    image: ${NS_DIND_IMAGE}
+    container_name: nightshift-dind
+    privileged: true
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - nightshift-dind-lib:/var/lib/docker   # inner images + containers
+      - nightshift-certs:/certs
+      - ./data:/data                          # SAME path as in orchestrator (see §2 gotcha)
+      - ./proxy:/proxy:ro                     # ditto: the proxy container mounts these
+      - ./dind-init:/dind-init:ro
+    networks:
+      nightshift-net:
+        # The dind server certificate is issued for "docker"/"localhost" only, so
+        # the orchestrator must reach it under that name.
+        aliases: [docker]
+    # deliberately no published ports: the inner API is reachable only on nightshift-net
+    healthcheck:
+      test: ["CMD", "docker", "-H", "tcp://127.0.0.1:2376", "--tlsverify",
+             "--tlscacert", "/certs/client/ca.pem",
+             "--tlscert", "/certs/client/cert.pem",
+             "--tlskey", "/certs/client/key.pem", "info"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      args:
+        NS_PYTHON_IMAGE: ${NS_PYTHON_IMAGE}
+        NS_DIND_IMAGE: ${NS_DIND_IMAGE}
+    image: nightshift-orchestrator:local
+    container_name: nightshift-orchestrator
+    restart: unless-stopped
+    depends_on:
+      dind:
+        condition: service_healthy
+    environment:
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_TLS_VERIFY: "1"
+      DOCKER_CERT_PATH: /certs/client
+    env_file: .env
+    volumes:
+      - nightshift-certs:/certs:ro
+      - ./data:/data
+      - ./secrets:/secrets:ro
+      - ./sandbox:/sandbox:ro                 # build context for the agent image
+      - ./proxy:/proxy:ro
+    networks: [nightshift-net]
+    healthcheck:
+      test: ["CMD", "python3", "/app/healthcheck.py"]
+      interval: 5m
+      timeout: 30s
+      retries: 3
+      start_period: 3m
+
+volumes:
+  nightshift-dind-lib:
+    name: nightshift-dind-lib
+  nightshift-certs:
+    name: nightshift-certs
+
+networks:
+  nightshift-net:
+    name: nightshift-net

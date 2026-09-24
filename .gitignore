@@ -1,0 +1,8 @@
+# Runtime, secrets and everything the loop generates. `data/` is the working
+# state of one run; a finished run is archived under `charters/` instead.
+.env
+secrets/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/

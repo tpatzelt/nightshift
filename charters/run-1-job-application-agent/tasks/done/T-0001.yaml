@@ -1,0 +1,70 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Write one JSONL file per profile at evals/fixtures/<profile>.jsonl, profile names
+  taken from evals/profiles.py PROFILES (start with ml-engineer-berlin, frontend-developer-munich,
+  backend-engineer-remote-germany). JSONL, one record per line, keeps the diff small.
+  Record schema (all keys required): {"url", "title", "final_url", "http_status",
+  "text", "label": {"kind": "posting"|"listing"|"index"|"other", "aggregator": bool,
+  "stale": bool, "location_ok": bool, "duplicate_of": <url or null>}}. Labels are
+  hand-assigned ground truth, NOT computed by src/url_heuristics.py or src/page_signals.py
+  - a label that just mirrors current behaviour makes the metric untestable. Cover
+  at least 18 records across the three profiles and include: employer-hosted ATS postings
+  (greenhouse/lever/personio/workable), aggregator index pages (indeed/stepstone/linkedin),
+  aggregator postings, careers listing pages, non-job pages, at least 3 stale pages
+  (English and German closed/filled wording), at least 3 duplicate pairs reachable
+  via tracking params (?gh_src=, ?utm_source=, /apply suffix) and at least one http-vs-https
+  / www-vs-bare pair, and at least 2 pages whose text names no preferred location.
+  Keep each "text" under 600 chars but above 300 (MIN_LIVE_TEXT_CHARS in evals/checks.py)
+  so liveness logic behaves realistically. All URLs must be synthetic/illustrative
+  - no personal data, no secrets. Add evals/corpus.py with a frozen dataclass CorpusRecord
+  and load_corpus(path: Path) -> list[CorpusRecord] plus load_all(dir: Path) -> dict[str,
+  list[CorpusRecord]]; it must reject a record with a missing or unknown label key
+  rather than silently defaulting. Do NOT edit .gitignore; evals/runs/ stays ignored
+  and is used only for harness output.'
+- "attempt 1: gate failures:\n  - acceptance command failed (2): uv run pytest -q\
+  \ tests/test_eval_corpus.py\n  - acceptance command failed (2): uv run pytest -q"
+- "attempt 2: gate failures:\n  - acceptance command failed (2): uv run pytest -q\
+  \ tests/test_eval_corpus.py\n  - acceptance command failed (2): uv run pytest -q"
+- 'Parked twice by an orchestrator bug, not by this task: the gate copied the worktree
+  including .venv, which is not relocatable, so pytest could not spawn. The gate now
+  clones the committed branch. Your previous work passed: 201 passed, 1 skipped.'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0001
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Labelled offline replay corpus + loader
+why: G1 needs recorded search results to replay, but evals/runs/ is gitignored (.gitignore:221)
+  and has never been committed, so the corpus the charter assumes is absent and no
+  offline harness can run. Record a committed, labelled corpus in the same shape a
+  real recording has, so every later metric is deterministic and reproducible from
+  a clean checkout.
+acceptance:
+- uv run pytest -q tests/test_eval_corpus.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/fixtures/**
+- evals/corpus.py
+- tests/test_eval_corpus.py
+protected_paths:
+- src/**
+- evals/checks.py
+- evals/run_eval.py
+- evals/recheck.py
+- evals/compare.py
+- evals/profiles.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 025566d
+merged_at: 2026-09-22T17:30:26+0200

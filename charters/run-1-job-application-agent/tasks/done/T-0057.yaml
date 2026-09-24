@@ -1,0 +1,77 @@
+depends_on:
+- T-0056
+new_tests_required: true
+attempts: 0
+notes:
+- 'Keep the change minimal. CrawlerEngine gets a `last_search_error: str | None` attribute,
+  set to None at the start of every search() call and set to the error string on the
+  transport-failure branch at src/crawler_engine.py:268. The budget-exhausted early
+  return is not an error and must leave it None. search() still returns [] and still
+  does not consume search budget.'
+- In the orchestrator, right after the 'search' tool invoke at src/orchestrator.py:184,
+  read getattr(self._crawler, 'last_search_error', None). When it is set, call report.record_error('search_failed',
+  query, RuntimeError(error)). Use getattr so the test doubles in tests/ and run_mock_test.py
+  that lack the attribute keep working.
+- Add COUNTER_LABELS['error_search_failed'] in src/run_report.py, e.g. 'web searches
+  failed (Brave API error)'.
+- 'Tests: in tests/test_search_resilience.py, reuse _make_engine. Assert last_search_error
+  is set after a persistent error, and is None after a good payload and after a legitimately
+  empty one. In tests/test_run_quality.py, use a ScriptedCrawler subclass that sets
+  last_search_error, then assert runs.json has error kind ''search_failed'' and counter
+  error_search_failed == 1. Optionally, assert the resulting _empty_scan_explanation
+  text in tests/test_bot_service.py.'
+- The error string lands only in runs.json and never in a Telegram message. The Brave
+  key travels in a header, never in the error text. Do not log or store request headers.
+- Offline only. Live Brave calls are not needed for this task; if you make one anyway,
+  make at most one and do not add it to any test. Do not reformat or rename existing
+  code.
+created: 2026-09-24T04:21:15+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0057
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Record a failed Brave search in the RunReport so an empty scan names it instead
+  of looking like 'no results'
+why: Verified at read-only HEAD 7e87c91. When Brave fails at the transport level after
+  three attempts, CrawlerEngine.search (src/crawler_engine.py:268-275) logs a warning
+  and returns []. The orchestrator (src/orchestrator.py:184-187) then counts urls_found
+  += 0, and no error is recorded. A scan against a Brave outage, a bad key or an exhausted
+  quota therefore reaches the user as 'no new matching jobs this time... I could not
+  fetch any job pages this run.' Nothing in the message says the search itself failed.
+  The G3 definition of done requires 'an error during a scan produces a message naming
+  what failed'. This task records the failure. T-0056 makes the message render error_
+  counters, which is why this task depends on it.
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+- grep -q 'search_failed' src/orchestrator.py
+- grep -q 'error_search_failed' src/run_report.py
+- grep -q 'last_search_error' tests/test_search_resilience.py
+allowed_paths:
+- src/crawler_engine.py
+- src/orchestrator.py
+- src/run_report.py
+- tests/test_search_resilience.py
+- tests/test_run_quality.py
+- tests/test_bot_service.py
+protected_paths:
+- src/url_heuristics.py
+- src/page_signals.py
+- src/notifier.py
+- src/telegram_api.py
+- src/bot_service.py
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 1805ea6
+merged_at: 2026-09-24T04:30:09+0200

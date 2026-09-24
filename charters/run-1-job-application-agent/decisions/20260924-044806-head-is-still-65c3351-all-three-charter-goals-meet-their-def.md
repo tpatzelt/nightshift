@@ -1,0 +1,12 @@
+# HEAD is still 65c3351, all three charter goals meet their definition of done, and no tasks are added
+
+_Recorded 20260924-044806 by the NIGHTSHIFT planner._
+
+## Context
+Checked the read-only mount at /repo/job-application-agent. HEAD is 65c3351 (T-0060), the same commit the last planning pass saw. The backlog is empty. There are no worker followups. Every parked task has already been superseded or re-issued, and the re-issues are merged (T-0026 to T-0030, T-0032 to T-0035, T-0039, T-0042, T-0049, T-0052). I replayed the corpus with `python -m evals.offline_eval`. It prints the per-metric table and all five TOTAL metrics are 1.000 across 58 records and 16 kept. The frozen arming baseline in evals/baseline.json is posting_shape 0.815, aggregator_drop 0.765, location_match 1.0, staleness 0.429 and dedup 0.571. So G2's definition of done holds: posting-shape and aggregator-drop improved and no metric regressed. The command then stopped with an error while writing its JSON report, because the mount is read-only (OSError EROFS on evals/runs/offline). That is a limit of this sandbox, not a defect in the code. G3's items (the Why: line, the notified ledger, and scan, delivery and missing-profile failure text asserted at the send boundary) are merged as T-0046, T-0049, T-0052, T-0056, T-0057 and T-0060, and the README documents them.
+
+## Decision
+Add no tasks and change nothing in the roadmap. The charter allows idle work only as tests, documentation or small refactors strictly within G1–G3. The test-only and README slices that the code needed have already landed. The mount shows no concrete untested user-visible path, no metric headroom and no documentation gap that would justify another task. Inventing one would widen scope for no measurable gain. Assumptions, chosen as the most conservative reading: (1) the EROFS failure on report writing is caused by the read-only planner mount and says nothing about the gate, which runs in a writable worktree; (2) parked tasks T-0007 through T-0048 must stay parked, because each one's work was re-issued and merged, and reviving any of them would duplicate work already done.
+
+## Consequences
+The backlog stays empty and runners stay idle, which costs no live-API quota. A later pass should add work only if HEAD moves, a worker files a followup, a gate regresses, or a concrete gap is found against the definition of done. Only charter-allowed idle work may be scheduled.

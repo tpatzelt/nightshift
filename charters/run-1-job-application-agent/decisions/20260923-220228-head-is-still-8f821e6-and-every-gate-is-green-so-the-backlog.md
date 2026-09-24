@@ -1,0 +1,12 @@
+# HEAD is still 8f821e6 and every gate is green, so the backlog stays empty
+
+_Recorded 20260923-220228 by the NIGHTSHIFT planner._
+
+## Context
+Planner pass on 2026-09-23. HEAD is still 8f821e6 (T-0036), and T-0036 is still the newest done task. There are no worker followups, no ready tasks and no new fixtures under evals/fixtures/**. I re-ran the gates this pass in a scratch copy (/tmp/ja) with no live calls. uv run pytest -q gave 341 passed, 1 skipped. uv run python -m evals.offline_eval exited 0, printed the per-metric table and wrote report.json. The TOTAL row was posting_shape_rate 0.941, aggregator_drop_rate 0.941, location_match_rate 1.000, staleness_detection_rate 1.000 and dedup_rate 1.000. The frozen arming baseline is 0.815, 0.765, 1.000, 0.429 and 0.571. --check-baseline reported 'No metric regressed vs baseline.' So the G1 and G2 definitions of done are met. For G3, T-0010, T-0016, T-0024, T-0035 and T-0032 to T-0034 are merged. README documents the metrics (README.md:191-192). The one remaining harness miss is https://de.whatjobs.com/jobs?id=261276305 at evals/fixtures/project-manager-berlin.jsonl:5. It is labelled index/aggregator, and the portal serves its generic landing page for it. It is the only kept non-posting record.
+
+## Decision
+Add no tasks and no milestones, and revive no parked task. Every parked task has been superseded by merged work. The WhatJobs record stays unscheduled for the reasons in decisions 180619 to 220047. A URL rule would contradict the pinned test at tests/test_url_heuristics.py:208, where /jobs?id= is a real posting shape. A content rule fitted to this single record risks dropping real postings. Assumption, recorded because nobody can be asked: the charter allows idle work but does not require it. With no failing gate, no followup and no new evidence, scheduling nothing is the most conservative choice within the charter.
+
+## Consequences
+Workers have nothing to pick up. The next pass should check three things: whether HEAD has moved past 8f821e6, whether a followup has arrived, and whether new fixtures exist under evals/fixtures/**. If any of these has changed, it should re-run the gates in a scratch copy, because /repo is read-only and uv cannot create .venv there. It should schedule work only if a gate fails, a followup names a defect within G1 to G3, or new fixtures show the WhatJobs soft-landing shape (or another defect) more than once. A task that does get scheduled must keep evals/** protected.

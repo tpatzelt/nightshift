@@ -1,0 +1,12 @@
+# No change: HEAD is still c53d325 and all goals remain met, so no work is scheduled
+
+_Recorded 20260923-225507 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty and there are no worker followups. HEAD of /repo/job-application-agent is still c53d325 (T-0043), the commit the last two planner passes checked. In this pass I re-ran `python -m evals.offline_eval` against the read-only mount. It printed the per-metric table with TOTAL: 58 records, 16 kept, and 1.000 on posting_shape_rate, aggregator_drop_rate, location_match_rate, staleness_detection_rate and dedup_rate. The arming baseline in evals/baseline.json (revision b6da8dd) is 0.815, 0.765, 1.000, 0.429 and 0.571, so two metrics improved as G2 requires and none regressed. The run then failed to write its report, only because /repo is mounted read-only (OSError EROFS on evals/runs). That is a sandbox restriction and not a code defect: in a writable checkout the report directory is created with mkdir(parents=True). For G3, src/notifier.py renders a 'Why: <reason>' line for each job (lines 116-118). The notification ledger (T-0024), per-call dedup (T-0035), and the tests asserting scan-error, dispatch-failure, intake, /run, no-new-jobs and chunking text at the send boundary (T-0032 to T-0034) are merged. Every parked task has been superseded by a re-issue that has since merged.
+
+## Decision
+Add no tasks, revive no parked tasks and add no milestones. Assumptions, recorded because the human cannot be asked: (1) The report-write failure is caused by the read-only mount, so it is not evidence of a G1 regression, and I scheduled no task for it. (2) The charter allows idle work but does not require it. With no followup, no new fixtures and no known message path lacking a content assertion, speculative tests or refactors would be the churn the non-goals discourage. (3) I made no live Brave or OpenRouter calls: they cost real money and are not needed to confirm goals that are already met. (4) I did not re-run pytest in this pass because the code has not changed since the previous pass recorded 347 passed and 1 skipped.
+
+## Consequences
+Workers stay idle, and neither the merge gates nor live-API spend are affected. A future pass should add work only when new evidence arrives: a worker followup, new recorded runs or fixtures that show a miss, a commit that changes the metrics, or a user-visible message path found to have no content assertion. Any such work must stay within the charter's allowed idle work.

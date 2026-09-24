@@ -1,0 +1,76 @@
+depends_on:
+- T-0006
+new_tests_required: true
+attempts: 2
+notes:
+- 'Two changes, both in classify_url''s helpers. (1) Add ATS hosts with their per-posting
+  path shape to _ats_kind: bamboohr.com (/careers/<id>), teamtailor.com (/jobs/<slug>),
+  softgarden.io and softgarden.de, jobvite.com (/job/<id>), breezy.hr (/p/<id>), applytojob.com
+  (/apply/<id>), icims.com (/jobs/<id>/), taleo.net, pinpointhq.com, hire.withgoogle.com.
+  Each must return LISTING for the vendor''s board root, matching how greenhouse and
+  lever are already handled - see tests/test_url_heuristics.py::test_ats_root_pages_are_listings_not_postings.
+  (2) Tighten _has_posting_id so a bare 4-digit segment in 1900-2100 range (a year)
+  and a bare segment that is a page number after /page/ do not count as a job ID;
+  keep UUIDs and 5+ digit runs. Add a test per added vendor plus regression tests
+  for /careers/2024/ and /jobs/page/2 classifying as LISTING or INDEX, not POSTING.
+  The acceptance run must show posting_shape_rate strictly above baseline with no
+  other metric below it.'
+- 'attempt 1: reviewer said revise: Verified independently: the 4 new test functions
+  all fail against HEAD~2 (checked by replaying tests/test_url_heuristics.py on a
+  clean archive of the pre-change tree), so the tests genuinely exercise the new behaviour
+  and are not tautologies. Scope is exactly the two allowed files, no deps, no secrets,
+  no protected path touched, and the new vendor blocks follow the existing greenhouse/lever
+  shape. Two blocking issues.
+
+
+  (1) Acceptance intent not met. The task requires ''posting_shape_rate strictly above
+  baseline''; I re-ran `python -m evals.offline_eval --check-baseline` and'
+- 'attempt 2: reviewer said approve: Independently verified. Scope: only src/url_heuristics.py
+  and tests/test_url_heuristics.py (124 lines, both in allowed_paths); no protected
+  path, no dependency, no secret, no prompt/deploy change. Code is sound: the 10 vendor
+  branches follow the existing greenhouse/lever/personio shape and none of the new
+  hosts collide with AGGREGATOR_HOSTS; in _has_posting_id the added `continue` after
+  the digit branch is safe because _DIGIT_RUN_RE is \d{5,} and can never match a <=4-char
+  pure-digit segment, so no prior true positive is lost. The year/page-number tightening''s
+  worst case'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0007
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Recognise more ATS posting shapes and stop false posting IDs
+why: _ats_kind in src/url_heuristics.py:136 covers nine ATS vendors, and _has_posting_id
+  treats any 3+ digit path segment as a job ID, so /careers/2024/ scores as a posting.
+  Both directions hurt posting_shape_rate, the other metric the charter names as must-improve.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_url_heuristics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+park_reason: 'reviewer said approve: Independently verified. Scope: only src/url_heuristics.py
+  and tests/test_url_heuristics.py (124 lines, both in allowed_paths); no protected
+  path, no dependency, no secret, no prompt/deploy change. Code is sound: the 10 vendor
+  branches follow the existing greenhouse/lever/personio shape and none of the new
+  hosts collide with AGGREGATOR_HOSTS; in _has_posting_id the added `continue` after
+  the digit branch is safe because _DIGIT_RUN_RE is \d{5,} and can never match a <=4-char
+  pure-digit segment, so no prior true positive is lost. The year/page-number tightening''s
+  worst case'

@@ -1,0 +1,46 @@
+depends_on:
+- T-0057
+new_tests_required: false
+attempts: 0
+notes:
+- Add one or two sentences to the Telegram notifications paragraph at README.md:111-122.
+  Quote the exact 'Errors:' prefix and the labels that T-0056 and T-0057 actually
+  merged, after reading src/bot_service.py and src/run_report.py. Do not guess them.
+- If the merged wording does not use 'Errors:', write the README sentence with the
+  merged wording, and report in a followup that this task's grep acceptance does not
+  match the merged prefix. Do not edit src/ to make the grep pass.
+- Do not restructure or reformat other README sections.
+created: 2026-09-24T04:21:15+0200
+max_diff_lines: 60
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0058
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: 'README: say that an empty scan''s message names the search, LLM or fetch failures
+  it hit'
+why: README.md:111-122 describes what the bot user is told when a scan raises, when
+  delivery fails, or when their profile is missing. Once T-0056 and T-0057 merge,
+  an empty scan's message also names search, query-generation, fetch and scoring failures
+  that the orchestrator caught. The README should say so, so an operator reading it
+  knows the 'no new matching jobs' message is not always a clean empty result. This
+  is documentation strictly within G3.
+acceptance:
+- uv run pytest -q
+- grep -q 'Errors:' README.md
+allowed_paths:
+- README.md
+protected_paths:
+- src/**
+- tests/**
+- evals/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: e49369b
+merged_at: 2026-09-24T04:32:25+0200

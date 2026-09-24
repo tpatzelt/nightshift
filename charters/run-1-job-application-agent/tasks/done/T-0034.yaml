@@ -1,0 +1,60 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Change tests only. src/** is protected. If _split_message turns out to lose characters,
+  for example lstrip('\n') dropping blank lines at a chunk boundary, do not fix src.
+  Mark the case with a pytest xfail(strict=True) that names the lost characters, and
+  report a followup.
+- 'Cases to cover: MAX_MESSAGE_CHARS-1 and exactly MAX_MESSAGE_CHARS, both of which
+  must come back as a single chunk equal to the input; a multi-line text well over
+  the limit; and a text over the limit that contains no newline at all. In each case,
+  every chunk must be at most MAX_MESSAGE_CHARS, and ''\n''.join(chunks) must equal
+  the input whenever the input''s lines are split only at single newlines.'
+- Add one send-boundary test. Monkeypatch src.telegram_api.requests.post, call TelegramClient('t').send_message('1',
+  long_text), and assert that the recorded payload texts equal _split_message(long_text)
+  in order, each with disable_web_page_preview True.
+- Keep the existing test_split_message_respects_limit. You may strengthen it, but
+  do not weaken or delete it.
+- No network and no dependence on TELEGRAM_BOT_TOKEN.
+- "attempt 1: gate failures:\n  - diff adds a pytest skip/xfail marker: +@pytest.mark.xfail(strict=True,\
+  \ reason=("
+created: 2026-09-23T17:31:47+0200
+max_diff_lines: 120
+timeout_min: 25
+max_turns: 30
+status: done
+id: T-0034
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert TelegramClient._split_message and send_message chunking are lossless
+  at the limit (third slice of parked T-0031)
+why: Every long job message passes through TelegramClient._split_message (src/telegram_api.py:105-118).
+  The only test, tests/test_telegram_api.py:72, covers a single over-limit case and
+  deletes every newline before it compares. So it never checks the exact-limit edge,
+  never checks the single-chunk case, and never checks reconstruction. This is item
+  (f) of parked T-0031. It uses a different file from T-0032 and T-0033, so it can
+  run in parallel with them.
+acceptance:
+- uv run pytest -q tests/test_telegram_api.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_telegram_api.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_bot_service.py
+- tests/test_notifier.py
+- tests/test_notify_ledger.py
+- tests/test_intake.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 1374dcb
+merged_at: 2026-09-23T17:50:35+0200

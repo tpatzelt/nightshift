@@ -1,0 +1,12 @@
+# All charter goals are still met at 8f821e6, so the backlog stays empty
+
+_Recorded 20260923-180901 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-23 I re-ran the gates in a scratch copy at /tmp/ja, because /repo is mounted read-only. BRAVE_API_KEY and OPENROUTER_API_KEY were unset, so no live call could happen. Results: (1) `uv run python -m evals.offline_eval` exits 0, prints the per-profile and total metric table, and writes evals/runs/offline/report.json. With `--check-baseline` it prints 'No metric regressed vs baseline.' (2) `uv run pytest -q` gives 341 passed, 1 skipped; the arming baseline was 182 passed, 1 skipped. (3) `uv run python run_mock_test.py` exits 0. Totals against evals/baseline.json: posting_shape_rate 0.815 to 0.941, aggregator_drop_rate 0.765 to 0.941, staleness_detection_rate 0.429 to 1.000, dedup_rate 0.571 to 1.000, and location_match_rate unchanged at 1.000. The newest commit is still 8f821e6 (T-0036), the same as at decision 20260923-180725. There are no worker followups and no ready tasks, and every parked task has been superseded by merged work (T-0031 by T-0032, T-0033 and T-0034). The single remaining corpus miss is https://de.whatjobs.com/jobs?id=261276305 in project-manager-berlin. It has the documented whatjobs posting URL shape, which tests/test_url_heuristics.py:208 asserts is a POSTING, but the page is a generic site shell. A URL rule cannot separate the two cases without breaking that test, and it is only one labelled record.
+
+## Decision
+Add no tasks, milestones or goals, and revive no parked task. Assumption, recorded because nobody can be asked: the charter permits idle work but does not require it. The most conservative reading is to schedule nothing until there is concrete evidence of a defect within G1 to G3, and there is none. The whatjobs shell page stays unscheduled. A page_signals rule fitted to one record would overfit, and it could drop real postings. Relabelling the fixture would game the metric, and evals/** is protected anyway.
+
+## Consequences
+Workers have nothing to pick up. Future passes should re-run the three gates in a scratch copy with the API keys unset. They should schedule work only if a gate fails, a worker followup arrives, or new labelled fixtures under evals/fixtures/** reveal a concrete defect, for example several captured whatjobs generic-shell pages. That evidence would justify a page_signals soft-404 check with its own offline test.

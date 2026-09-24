@@ -1,0 +1,43 @@
+depends_on:
+- T-0004
+new_tests_required: false
+attempts: 0
+notes:
+- Add one section after the existing '## Tests' heading. State that the harness is
+  fully offline and needs no BRAVE_API_KEY or OPENROUTER_API_KEY, show `uv run python
+  -m evals.offline_eval` and `--check-baseline`, say the report lands in evals/runs/offline/report.json
+  (gitignored), and define each of the five metrics in one sentence, matching the
+  definitions implemented in evals/metrics.py exactly. Note that evals/fixtures/ is
+  the committed corpus because evals/runs/ is gitignored, and that --corpus can point
+  at a real recorded run. Do not restructure or reformat the rest of the README.
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0005
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: 'README: document the offline metrics and how to run them'
+why: G1's definition of done explicitly requires the README to explain what each metric
+  means and how to run the harness; without it the scores are uninterpretable to the
+  human returning in two weeks.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q
+allowed_paths:
+- README.md
+protected_paths:
+- src/**
+- evals/**
+- tests/**
+- docs/**
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: a9e285e
+merged_at: 2026-09-22T22:27:28+0200

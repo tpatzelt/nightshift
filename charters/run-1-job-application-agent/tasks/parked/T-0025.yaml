@@ -1,0 +1,85 @@
+depends_on:
+- T-0024
+new_tests_required: true
+attempts: 2
+notes:
+- Enumerate every string src/bot_service.py and src/telegram_api.py can put in front
+  of a user — the /start and intake replies from _dispatch (:177), the _handle_run_command
+  replies (:186), the no-new-jobs message and each branch of _empty_scan_explanation
+  (:33), the status output, and the scan-error text from T-0016 including its _scrub_secrets
+  pass (:65) — and assert each one's content at the send boundary with requests.post
+  monkeypatched.
+- 'Also assert TelegramClient._split_message keeps every chunk within MAX_MESSAGE_CHARS
+  and loses no characters: concatenating the chunks must reproduce the input modulo
+  the split newline, for a text just under, exactly at, and well over the limit.'
+- 'Tests only: src/** is protected here. If a path cannot be asserted without a source
+  change, leave it and report it as a followup naming the path and what change it
+  would need — do not reach into src.'
+- No live Telegram call and no network of any kind; the suite must stay deterministic
+  and repeatable, and must not depend on TELEGRAM_BOT_TOKEN being present.
+- 'attempt 1: reviewer said revise: The diff is on-charter (G3/M3), tests-only, inside
+  allowed_paths, and offline. The gates pass. Many new assertions are good: exact
+  strings for all four _empty_scan_explanation branches, all three _handle_run_command
+  replies, the no-new-jobs message with its explanation suffix, the no-cause _format_scan_error
+  branch, and _split_message at just under, exactly at, and well over the limit, including
+  reconstruction of the input. The task still isn''t done, for three concrete reasons.
+
+
+  (1) The task asks for each message to be asserted ''at the send boundary with requests.post
+  mon'
+- 'attempt 2: reviewer said revise: The diff is on-charter (G3/M3), changes only tests
+  inside allowed_paths, stays offline, and passes the gates. Most of the new send-boundary
+  assertions are good. With requests.post patched at src.telegram_api.requests.post,
+  the tests check the /start, /status (both branches), /help, /reset and CV-paste
+  replies, all three _handle_run_command replies, all four _empty_scan_explanation
+  branches through _run_scan''s no-new-jobs message, and _split_message at just under,
+  exactly at, and well over MAX_MESSAGE_CHARS, with lossless ''\n''.join reconstruction.
+
+
+  One path the task explic'
+created: 2026-09-23T08:22:05+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0025
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the content of every remaining user-visible message path (supersedes
+  parked T-0017)
+why: G3's definition of done requires a test per user-visible message path, but tests/test_bot_service.py
+  (144 lines) covers scan scheduling and asserts no message text at all, and _empty_scan_explanation
+  (src/bot_service.py:33), _format_scan_error (:71), _safe_send (:351) and TelegramClient._split_message
+  (src/telegram_api.py:105) are never checked for content. Re-issues parked T-0017,
+  which was unreachable behind parked T-0015.
+acceptance:
+- uv run pytest -q tests/test_bot_service.py tests/test_telegram_api.py tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+- tests/test_telegram_api.py
+- tests/test_notifier.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_run_quality.py
+- tests/test_notify_ledger.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 6
+park_reason: 'reviewer said revise: The diff is on-charter (G3/M3), changes only tests
+  inside allowed_paths, stays offline, and passes the gates. Most of the new send-boundary
+  assertions are good. With requests.post patched at src.telegram_api.requests.post,
+  the tests check the /start, /status (both branches), /help, /reset and CV-paste
+  replies, all three _handle_run_command replies, all four _empty_scan_explanation
+  branches through _run_scan''s no-new-jobs message, and _split_message at just under,
+  exactly at, and well over MAX_MESSAGE_CHARS, with lossless ''\n''.join reconstruction.
+
+
+  One path the task explic'

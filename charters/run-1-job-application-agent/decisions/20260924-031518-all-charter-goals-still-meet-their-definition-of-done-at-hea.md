@@ -1,0 +1,12 @@
+# All charter goals still meet their definition of done at HEAD 9fd170c; verified in a writable copy, no ops this pass
+
+_Recorded 20260924-031518 by the NIGHTSHIFT planner._
+
+## Context
+HEAD is still 9fd170c (T-0052 merge). The backlog has no ready tasks and there are no worker followups. Every parked task's work has since merged under a re-issued id: T-0024, T-0026 to T-0030, T-0032 to T-0036, T-0039, T-0042, T-0045, T-0049 and T-0052. The previous pass could not confirm that offline_eval exits 0, because /repo is mounted read-only. This pass copied the repo to /tmp/jaa and ran the gates there. `uv run python -m evals.offline_eval` exited 0. It printed the per-profile and TOTAL table (58 records, 16 kept, 1.000 on posting_shape_rate, aggregator_drop_rate, location_match_rate, staleness_detection_rate and dedup_rate) and wrote evals/runs/offline/report.json. The arming baseline in evals/baseline.json is 0.815, 0.765, 1.000, 0.429 and 0.571 for the same five metrics. So G2 improves on posting-shape and aggregator-drop, and no metric regresses. `uv run pytest -q` gave 369 passed, 1 skipped, which is above the 182+1 baseline at arming. G3 is covered by merged tasks: T-0046 (the Why: line), T-0024 and T-0035 (no repeat notifications), and T-0032 to T-0034, T-0045, T-0049 and T-0052 (message-content assertions and failure texts).
+
+## Decision
+Emit no ops. Parked tasks stay parked because their work has already landed under re-issues. evals/baseline.json stays frozen at the arming revision. Assumptions: (1) The /tmp copy is a faithful stand-in for the merge gates' writable checkout, since it is the same tree at the same HEAD. (2) Idle work is allowed but not required. I checked idle candidates in earlier passes and found them already covered, so adding churn to a bot with real users is not the conservative choice. (3) I made no live Brave or OpenRouter calls, because no open question needs them.
+
+## Consequences
+The backlog stays empty until a worker followup, a new fixture or a gate failure shows a concrete gap inside G1 to G3. Later passes should then schedule only the charter's allowed idle work: tests, docs and small refactors. They should not revive parked tasks or reuse the ids T-0037, T-0041, T-0044, T-0047 or T-0051. If a later HEAD pushes any metric in the offline_eval TOTAL row below 1.000, or pytest drops below 369 passed, schedule a fix with an offline test that fails without the fix. To verify in this sandbox, copy the repo to /tmp first, because /repo is read-only.

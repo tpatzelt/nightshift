@@ -1,0 +1,62 @@
+depends_on:
+- T-0004
+new_tests_required: true
+attempts: 1
+notes:
+- 'evals/** is protected so the metric definitions and the frozen baseline cannot
+  be adjusted to manufacture an improvement. Extend AGGREGATOR_HOSTS and, where a
+  host has a recognisable per-posting URL shape, extend _aggregator_kind so real postings
+  on those hosts still classify as POSTING rather than being lost with the index pages
+  - dropping everything on a board host would raise aggregator_drop_rate while regressing
+  posting_shape_rate, and --check-baseline will reject that. Candidates worth covering:
+  stellenanzeigen.de, stellenmarkt.de, meinestadt.de, jobware.de, absolventa.de, jobvector.de,
+  talent.com, careerjet., neuvoo., simplyhired., whatjobs.com, jobsora.. Verify each
+  addition does not shadow an ATS host already handled in _ats_kind. Add a test per
+  added host asserting both is_aggregator_url and the classify_url kind for an index
+  URL and, where applicable, a posting URL. The acceptance run must show aggregator_drop_rate
+  strictly above baseline with no other metric below it.'
+- 'attempt 1: reviewer said revise: The diff is on-charter (G2), inside allowed_paths,
+  adds no deps/secrets, and the new tests do fail if reverted (is_aggregator_url is
+  False pre-change; absolventa''s posting URL classified OTHER pre-change; the stellenanzeigen/jobware
+  _aggregator_kind rules are load-bearing, without them those postings become INDEX).
+  Two problems block approval.
+
+
+  (1) The exact regression the task notes warned about is present for the uncovered
+  hosts. Adding a host to AGGREGATOR_HOSTS without a posting rule makes _aggregator_kind
+  return INDEX for *every* path on that host, and the orchestrat'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0006
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Widen aggregator host coverage so board pages are dropped
+why: AGGREGATOR_HOSTS in src/url_heuristics.py:20 lists 13 hosts and misses most German-market
+  boards, so their index pages survive triage and consume the result budget. This
+  is one of the two metrics the charter names as must-improve.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_url_heuristics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 758f6d8
+merged_at: 2026-09-22T22:46:40+0200

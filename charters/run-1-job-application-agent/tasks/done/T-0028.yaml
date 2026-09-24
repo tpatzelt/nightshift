@@ -1,0 +1,71 @@
+depends_on:
+- T-0027
+new_tests_required: true
+attempts: 0
+notes:
+- 'One branch per vendor in _ats_kind, following the existing greenhouse/lever/personio
+  shape (confirmed still at src/url_heuristics.py:148 today), each returning POSTING
+  for the per-posting path and LISTING for the vendor''s board root: bamboohr.com
+  /careers/<id>, teamtailor.com /jobs/<slug>, softgarden.io and softgarden.de, jobvite.com
+  /job/<id>, breezy.hr /p/<id>, applytojob.com /apply/<id>, icims.com /jobs/<id>/,
+  taleo.net, pinpointhq.com, hire.withgoogle.com. Re-check before adding that none
+  of these hosts is matched by AGGREGATOR_HOSTS (T-0006 widened that tuple to 26 entries
+  and it is substring-matched against the host); a collision would change which branch
+  wins.'
+- Keep tests/test_url_heuristics.py::test_ats_root_pages_are_listings_not_postings
+  green by extending it rather than replacing it. One posting test and one board-root
+  test per vendor.
+- The acceptance run must show posting_shape_rate strictly above the baseline T-0027
+  re-froze, with no other metric below it; quote the delta table in the output. This
+  is only measurable because T-0026 removed non-POSTING records from the kept set
+  and T-0027 put vendor board roots in the corpus - if the delta is +0.000, do not
+  adjust the metric or the corpus (evals/** is protected here); report which vendors
+  have no corpus record as a followup.
+- If T-0029 (year and page-number segments) has already landed, extend around it rather
+  than reverting it - both tasks edit src/url_heuristics.py but different functions,
+  and either order is fine.
+- No new dependency, no network in tests, no key anywhere. `uv run pytest -q` must
+  stay green.
+created: 2026-09-23T12:08:03+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0028
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Recognise the ATS vendors _ats_kind still misses (supersedes parked T-0021)
+why: '_ats_kind (src/url_heuristics.py:148) knows nine vendors: greenhouse, lever,
+  myworkdayjobs, smartrecruiters, recruitee, ashbyhq, join.com, workable, personio.
+  Postings and board roots on bamboohr, teamtailor, softgarden, jobvite, breezy.hr,
+  applytojob, icims, taleo, pinpointhq and hire.withgoogle fall through to _has_posting_id
+  (:262) and are judged on digit shape alone, so a vendor board root scores as a posting
+  and, after T-0026, is kept as if it were a reported job. posting_shape_rate is one
+  of the two metrics the charter names as must-improve. Re-issues parked T-0021, which
+  was unreachable behind parked T-0020.'
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_url_heuristics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- src/bot_service.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 2
+merged_sha: c1d3447
+merged_at: 2026-09-23T12:47:16+0200

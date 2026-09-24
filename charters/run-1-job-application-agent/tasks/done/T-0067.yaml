@@ -1,0 +1,60 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Tests only, in tests/test_intake.py. In test_active_state_chat_reply, replace the
+  substring checks on the reply with `assert reply == "You're all set up - I'm scanning
+  for jobs regularly.\n" + HELP_TEXT`, and import HELP_TEXT from src.intake in the
+  existing import block. Keep the state assertions.
+- In test_start_reply_when_already_active, replace the three substring checks with
+  one equality assertion against the full string quoted in 'why'. Write the emoji
+  as \U0001f3af, \U0001f4cd, \U0001f511, \U0001f3ed and \U0001f310 escapes, to match
+  src/intake.py. Keep the state assertion.
+- Do not edit src/. If the text you observe differs from 'why', stop and report it
+  in a followup. Do not change the code and do not weaken the assertions.
+- Offline only. Make no live Brave, OpenRouter or Telegram call.
+created: 2026-09-24T08:58:00+0200
+max_diff_lines: 50
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0067
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the exact text of the active-user chat reply and the /start reply for
+  an already-set-up user
+why: 'G3''s definition of done says every user-visible message path must have a test
+  that asserts its content. On a scratch copy at HEAD cc1a1b6 I checked each reply
+  path in src/intake.py against the tests. Two paths reach the user through BotService._dispatch
+  -> send_message and are only checked by fragments. The first is _handle_active_chat
+  (src/intake.py:192): tests/test_intake.py:465 test_active_state_chat_reply checks
+  two substrings. The second is the /start reply when the user is already active,
+  in _handle_start (src/intake.py:126-130): tests/test_intake.py:481 test_start_reply_when_already_active
+  checks three substrings, so the parameter block could change without any test failing.
+  I drove both paths with the existing COMPLETE extraction and the test file''s _manager/_msg/_doc
+  helpers. The replies are "You''re all set up - I''m scanning for jobs regularly.\n"
+  + HELP_TEXT and "You''re already set up. Your search parameters:\n\U0001f3af Roles:
+  Project Manager\n\U0001f4cd Locations: Berlin, Germany\n\U0001f511 Keywords: digital
+  transformation\n\U0001f3ed Industries: public sector\n\U0001f310 Language: English\n\nUse
+  /run to scan now or /reset to start over." Equality assertions for both passed on
+  the scratch copy. This is tests-only idle work, strictly within G3.'
+acceptance:
+- uv run pytest -q
+- grep -q 'You.re all set up - I.m scanning for jobs regularly.\\n" + HELP_TEXT' tests/test_intake.py
+- grep -q 'Use /run to scan now or /reset to start over."' tests/test_intake.py
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_intake.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 8e4db4e
+merged_at: 2026-09-24T09:00:51+0200

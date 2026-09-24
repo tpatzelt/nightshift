@@ -1,0 +1,12 @@
+# HEAD is still c9f785f with no followups, so the backlog stays empty
+
+_Recorded 20260924-092751 by the NIGHTSHIFT planner._
+
+## Context
+I re-read the repo, which is mounted read-only at /repo/job-application-agent. HEAD is still c9f785f (T-0070) on agent/integration, which is up to date with its origin. This is the same tree the three previous planner passes checked. In those passes the harness reported 58 records with 16 kept and all five metrics at 1.000, and the suite gave 388 passed, 1 skipped. T-0063 pins those totals in a test. I did not re-run the suite or the harness in this pass because the code has not changed. This pass checked the G3 message paths by hand. I compared every reply string in src/intake.py and src/bot_service.py against tests/test_intake.py and tests/test_bot_service.py. Each of these has an exact-text (==) assertion: /reset, /help, /start in every state, the WELCOME text, the CV-received reply, the motivation-received reply, the /skip job-prefs prompt, the mid-setup /status replies, the fallback 'Send /start to begin.', the question-count prefix, 'I need a bit more information', 'Please answer in a short text message.', the active-chat reply, every branch of _empty_scan_explanation, the missing-profile message and the scan-error message. The README documents each of the five metrics, how to run the harness and --check-baseline. The backlog is empty, there are no worker followups, and every parked task is either superseded or its work has since landed.
+
+## Decision
+Add no tasks and change no milestones. G1, G2 and G3 each meet their definition of done, and nothing new has come in: no followups, no new commits and no failing gate. The charter allows idle work only when it stays strictly within G1-G3. The test-only idle work has already been done (T-0063 to T-0070), and I found no specific untested message path or metric gap to justify another task. Assumption: the roadmap still lists M1-M3 as 'planned', but there is no op that sets milestone status. Following the conservative reading, I left the roadmap text unchanged rather than trying to work around that.
+
+## Consequences
+Runners will find no ready tasks, and the gates stay as the last run found them: 388 passed, 1 skipped, with every harness metric at 1.000. Later passes should produce no ops unless HEAD moves, a followup arrives or a gate regresses. If that happens, the pass should schedule a targeted fix that cites the charter goal it affects.

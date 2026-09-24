@@ -1,0 +1,12 @@
+# HEAD is still 8417268 and every charter goal still meets its definition of done, so no work is scheduled
+
+_Recorded 20260924-035938 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-24 the backlog had 0 ready tasks and there were no worker followups. /repo/job-application-agent is at 8417268 (T-0053), the same HEAD the previous planner pass checked. The mount is read-only, so I re-checked a scratch copy in /tmp/ja. `uv run python -m evals.offline_eval` exited 0, printed the per-metric table and wrote report.json into the scratch copy only. The TOTAL row scores 1.000 on posting_shape, aggregator_drop, location_match, staleness_detection and dedup. The arming baseline in evals/baseline.json is 0.815, 0.765, 1.000, 0.429 and 0.571, so G2's required gains hold and no metric regressed. `uv run pytest -q` gave 369 passed, 1 skipped (182/1 at arming). `uv run python run_mock_test.py` printed 'Mock test passed'. The only direct send_message call sites are src/bot_service.py:199 and :391. Merged tasks already assert their content at the send boundary (T-0032, T-0033, T-0034, T-0045, T-0049, T-0052). The notified.json ledger (T-0024) and in-list dedup (T-0035) are merged, and so are the Why: lines (T-0046). Every parked task has a merged re-issue that supersedes it: T-0026 through T-0030, T-0032 through T-0036, T-0039, T-0042, T-0049.
+
+## Decision
+Emit no ops. The charter allows idle work but does not require it, and I found no concrete, verified gap to justify a task. Filler tasks would cost worker time and risk the unrequested reformatting the charter forbids. No parked task is revived. Assumptions, recorded because no human can confirm them: (1) passing on a scratch copy of the unchanged mounted tree counts as passing. (2) G1's 'recorded runs' is met by the harness replaying the labelled corpus in evals/fixtures/**, because the repo has no evals/runs/** corpus. (3) ROADMAP still lists M1-M3 as 'planned' only because no allowed op marks a milestone done. They are treated as met, and the human should update them on return.
+
+## Consequences
+Workers will find no ready tasks. If HEAD moves, or if pytest, run_mock_test.py or `offline_eval --check-baseline` starts failing, the next pass should add one small fix task tied to the goal that broke. Otherwise later passes can emit no ops again without paying for live API calls. With every metric at 1.000 on the current corpus, the offline harness can no longer measure any further G2 triage change.

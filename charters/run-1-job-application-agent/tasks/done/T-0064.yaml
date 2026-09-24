@@ -1,0 +1,64 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Tests only. Add one test named test_unwritable_ledger_still_delivers_and_does_not_resend_in_same_notifier
+  to tests/test_notify_ledger.py. Reuse the file's existing _result and _Response
+  helpers and its monkeypatch of requests.post.
+- 'Make the ledger unwritable portably: write a regular file at tmp_path / ''blocker''
+  and pass ledger_path=tmp_path / ''blocker'' / ''notified.json''. Do not use chmod,
+  because it does not work when running as root.'
+- 'Assert: the first notify_results([_result()]) returns True and exactly 1 message
+  was sent, and that message contains ''Why: matches your Python skills''. It does
+  not raise. A second notify_results([_result()]) on the SAME notifier instance returns
+  True and the send count is still 1. Optionally, use caplog to assert that a WARNING
+  containing ''Could not write notification ledger'' was logged.'
+- Do not assert behaviour across a new TelegramNotifier instance in this test. Without
+  a writable ledger, a resend after restart is expected and is not the claim here.
+- Do not edit src/. If the observed behaviour differs from the description above,
+  stop and report it in a followup instead of changing the code or weakening the assertions.
+- Offline only. Make no live Brave, OpenRouter or Telegram call.
+created: 2026-09-24T08:36:11+0200
+max_diff_lines: 60
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0064
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert that an unwritable notification ledger neither breaks delivery nor lets
+  the same notifier resend a posting
+why: 'G3''s definition of done requires that ''a job already notified is provably
+  not notified again''. tests/test_notify_ledger.py covers resend across runs, failed
+  sends, a corrupt ledger on read, duplicates within one call, no ledger, and canonical
+  URLs. No test covers the write-failure branch of TelegramNotifier._save_ledger (src/notifier.py):
+  grep for ''Could not write'', OSError or _save_ledger in tests/ finds nothing. I
+  checked the current behaviour on a scratch copy at HEAD 2046f15. With ledger_path=<tmp>/blocker/notified.json,
+  where ''blocker'' is a regular file, the first notify_results call logs ''Could
+  not write notification ledger ... File exists'', returns True and sends 1 message.
+  A second notify_results call on the same instance with the same URL returns True
+  and sends nothing more, because _mark_notified updates the in-memory set before
+  saving. This behaviour is correct, but nothing pins it, so a refactor could make
+  a disk error raise out of a scan or cause a resend. At HEAD 2046f15, pytest gives
+  384 passed and 1 skipped, and offline_eval scores 1.000 on every metric. This is
+  test-only idle work strictly within G3.'
+acceptance:
+- uv run pytest -q
+- grep -q 'def test_unwritable_ledger_still_delivers_and_does_not_resend_in_same_notifier'
+  tests/test_notify_ledger.py
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_notify_ledger.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 5c1055a
+merged_at: 2026-09-24T08:39:01+0200

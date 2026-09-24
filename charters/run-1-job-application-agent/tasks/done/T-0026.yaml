@@ -1,0 +1,126 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'The change itself is one step: in replay_keep, keep the existing drop order and
+  every existing reason exactly as it is (dedup by canonical URL first, then OTHER,
+  then aggregator INDEX, then redirected_off_posting, http_status >= 400, empty text,
+  find_stale_marker, location) and add `if kind != POSTING: continue` as one more
+  step at the end, importing POSTING from src.url_heuristics. Each drop stays attributable
+  to a named rule and staleness_detection_rate/aggregator_drop_rate keep measuring
+  what they measure today. Do not touch evals/metrics.py - the metric definitions
+  are not what changes, only which records are declared ''kept''.'
+- 'Measured, not assumed: I applied exactly that gate in a writable copy of today''s
+  tree and ran the harness. Before: records 23, kept 12, posting_shape 0.750, aggregator
+  1.000, location 1.000, staleness 1.000, dedup 0.750. After: records 23, kept 9,
+  posting_shape 1.000, the other four unchanged. The three departing records are correctly-classified
+  careers pages (dataforge/pixelforge/exampleai .example/careers). `uv run python
+  -m evals.rebaseline --corpus evals/fixtures` with the gate in place resolved b6da8dde58199f59a3750127a1f90d30045f480a
+  and produced the identical totals for ARMING src (23/9, posting 1.000, dedup 0.750),
+  so `--check-baseline` exits 0 after the re-freeze. Reproduce these numbers and quote
+  the arming-vs-current delta table in the task output; if yours differ, say so rather
+  than adjusting anything.'
+- Exactly three tests fail with the gate in place - I ran the full suite (268 passed,
+  1 skipped before the change; the charter's 182/1 is the arming number, the suite
+  has grown since). (1) tests/test_offline_eval.py::test_replay_keeps_non_aggregator_index_page
+  - the behaviour it asserts is the behaviour being changed; invert it and update
+  the MIXED_CORPUS expectations with the comment explaining why each record survives
+  or not kept accurate. (2) tests/test_rebaseline.py::test_replay_reproduces_committed_baseline_totals
+  - hard-codes the arming totals (records 23, kept 12, posting_shape_rate 0.750);
+  replace that assertion with one that reads evals/baseline.json and compares the
+  arming replay to it key for key, so it stays true across every future re-freeze.
+  Leave the other five T-0018 guarantees intact, in particular the non-tautological
+  old-src discriminator asserting the exported src/url_heuristics.py contains 'devjobs.de'
+  and not 'stellenanzeigen.de' while the working tree's contains both. (3) tests/test_offline_baseline.py::test_check_baseline_fails_and_names_regressed_metric
+  - it forces a regression by inflating posting_shape_rate to 1.0, but under posting-only
+  semantics the corpus already scores 1.000, so nothing regresses and the assertion
+  fails. This is the file that was missing from T-0019's allowed_paths and it is the
+  whole reason that task died twice.
+- 'When you fix that third test, make it corpus-independent rather than swapping one
+  hard-coded number for another: build the inflated baseline as `inflated[name] =
+  (current[name] or 0.0) + 0.1` for the metric you pick and assert that metric''s
+  name appears in the message. Apply the same treatment to test_main_check_baseline_exit_code_one_on_regression,
+  which today pins dedup_rate to 1.0 and will break again the moment T-0030 raises
+  dedup_rate to 1.000. A test that re-breaks on every legitimate quality improvement
+  is a deadlock generator; this backlog has already lost two days to one.'
+- 'Re-freeze the baseline with the T-0018 tool, never from the current tree: `uv run
+  python -m evals.rebaseline --corpus evals/fixtures --out evals/baseline.json`. The
+  tool copies the CURRENT evals/ package next to the ARMING revision''s src/, so the
+  new semantics apply to both sides of the comparison and no improvement is erased
+  or invented. One wrinkle I hit and you will too: rebaseline writes the resolved
+  absolute corpus path into the baseline''s corpus_dir field, so the committed file
+  would carry a sandbox path. Hand-edit that one field back to the repo-relative "evals/fixtures"
+  (evals/baseline.json is in allowed_paths); nothing reads it - check_baseline compares
+  totals.metrics only, and I grepped evals/ and tests/ to confirm no other reader.'
+- 'Record the semantic change where a reader will find it: the evals/offline_eval.py
+  module docstring (which currently says kept is ''what would reach LLM scoring'')
+  and the README metrics section. State the assumption explicitly, since nobody can
+  be asked: a LISTING page from which no posting links can be harvested IS scored
+  directly in production, and this harness counts it as dropped; corpus records carry
+  no links field, so the harvest branch cannot be replayed, and modelling hub pages
+  as never-reported is the conservative reading that matches the common path.'
+- 'New tests that fail without the change: a record whose URL classifies LISTING (https://acme.example/careers)
+  is absent from replay_keep''s output while an ATS posting URL on the same profile
+  is present; a non-aggregator INDEX-shaped URL is likewise absent.'
+- No new dependency, no network, no live API call, no key in any file or log. `uv
+  run pytest -q` must stay green. If something still blocks you, report blocked and
+  name the exact file and gate that stopped you - a blocked report that names its
+  obstacle is what lets the next planning pass fix the task file instead of re-running
+  it into the same wall.
+created: 2026-09-23T12:08:03+0200
+max_diff_lines: 300
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0026
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: 'Score results, not hub pages: make the harness sensitive to posting-vs-listing
+  (supersedes parked T-0019)'
+why: 'evals/offline_eval.py:60 replay_keep drops only OTHER URLs and aggregator INDEX
+  pages, so a LISTING or non-aggregator INDEX record counts as kept. Production does
+  the opposite: src/orchestrator.py:406 harvests posting links out of any non-POSTING
+  page and returns without scoring it, so a careers/board hub never becomes a JobResult.
+  Until kept models ''what becomes a reported result'', reclassifying a vendor board
+  root from POSTING to LISTING moves no metric at all, and the two G2 url_heuristics
+  tasks are arithmetically unable to move posting_shape_rate - the metric the charter
+  names as must-improve. Re-issues parked T-0019, whose two attempts both died on
+  the same unrepaired defect in its own task file: the change breaks tests/test_offline_baseline.py,
+  which was not in its allowed_paths (attempt 1 was gated for exactly that; attempt
+  2 reported blocked). That file is in scope here. I verified the whole task is otherwise
+  executable in a writable copy of the tree: the one-line gate produces the numbers
+  below, `python -m evals.rebaseline` resolves origin/main to b6da8dd and re-freezes
+  cleanly, and the suite returns to green once three named tests are updated.'
+acceptance:
+- uv run python -m evals.offline_eval
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_offline_eval.py tests/test_rebaseline.py tests/test_offline_baseline.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/offline_eval.py
+- evals/baseline.json
+- tests/test_offline_eval.py
+- tests/test_rebaseline.py
+- tests/test_offline_baseline.py
+- README.md
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/rebaseline.py
+- evals/profiles.py
+- evals/fixtures/**
+- tests/test_offline_metrics.py
+- tests/test_eval_corpus.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 0
+merged_sha: '6542654'
+merged_at: 2026-09-23T12:17:01+0200

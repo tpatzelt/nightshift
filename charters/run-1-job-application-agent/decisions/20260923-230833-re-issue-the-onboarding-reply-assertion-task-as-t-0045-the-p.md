@@ -1,0 +1,12 @@
+# Re-issue the onboarding-reply assertion task as T-0045: the planned T-0044 never reached the backlog
+
+_Recorded 20260923-230833 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-23 the previous planner pass recorded that it added T-0044 (G3/M3, tests only in tests/test_intake.py). /plan/backlog contains only EXAMPLE.yaml.txt, and T-0044 is in neither /plan/done nor /plan/parked. This is the same failure that hit planned T-0037 and T-0041. HEAD is still c53d325 and the working tree is clean. I re-read src/intake.py and tests/test_intake.py and confirmed the gap still exists: about eight replies that reach users through bot_service._dispatch (motivation received, the job-prefs prompt, the empty-answer prompt, the ACTIVE-state chat reply, /start when already active, the 'need more information' lead-in, the question counter, and the _prompt_for_state fallbacks) have no content assertions. Earlier passes recorded that G1 and G2 meet their definition of done: every offline_eval TOTAL is 1.000, against the arming baseline of 0.815/0.765/1.000/0.429/0.571.
+
+## Decision
+Add T-0045 with the same scope as T-0044. It is tests only, allowed_paths is limited to tests/test_intake.py, src/** is protected, max_diff_lines is 250, and there are no dependencies. I did not revive any parked task, because each one was superseded by merged work. I added no G2 work: the harness has no headroom left, and inventing corpus records would be new work. Assumptions: (1) The gates at c53d325 were not re-run in this pass. It relies on the recorded results: pytest 347 passed, 1 skipped; run_mock_test passing; offline_eval exiting 0. (2) src/intake.py is not one of G3's named files, but its replies are user-visible message paths, so G3's definition of done covers them. I read this conservatively and add assertions only, with no source changes. (3) The evals/fixtures corpus stands in for the charter's evals/runs/**, as in earlier passes. (4) M1–M3 stay 'planned' in ROADMAP.md, because no available op sets milestone status.
+
+## Consequences
+When T-0045 merges, all three goals meet their definition of done, and later passes should schedule only the charter's allowed idle work. If a defect in an intake reply is found, it arrives as a strict xfail plus a followup, and the fix becomes a separate small G3 task. If T-0045 also fails to appear in the backlog, the next pass should report the planner-to-backlog handoff as a system fault instead of issuing yet another re-issue number.

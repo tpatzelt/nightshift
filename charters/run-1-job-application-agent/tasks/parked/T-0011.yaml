@@ -1,0 +1,98 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- 'The procedure was verified by the planner before this task was written, so implement
+  it rather than inventing another: `git archive <rev> src | tar -x -C <tmpdir>`,
+  copy the CURRENT evals/ package into the same tmpdir, then run `python -m evals.offline_eval
+  --corpus <abs path to corpus> --out <tmpdir>/out` as a subprocess with cwd=<tmpdir>,
+  and read <tmpdir>/out/report.json. Run that way the arming revision reproduces the
+  committed baseline totals exactly: posting_shape_rate 0.750, aggregator_drop_rate
+  1.000, location_match_rate 1.000, staleness_detection_rate 1.000, dedup_rate 0.750.
+  Make that the core test. Default --rev to `git merge-base HEAD origin/main` (which
+  resolves to b6da8dd ''wip: baseline for nightshift'', the arming commit; only src/url_heuristics.py
+  has changed under src/ since then) and allow an explicit override. Print the same
+  table shape offline_eval prints, and support an optional --out <path> that writes
+  a baseline JSON in exactly the schema evals/baseline.json already uses, with the
+  resolved revision recorded in it; this task must not write evals/baseline.json itself
+  (it is protected here) - T-0012 does that. Standard library only: subprocess, tempfile,
+  shutil, json. No network: git reads the local object store. If git or .git is unavailable,
+  or the revision cannot be resolved, exit with a clear message and have the test
+  pytest.skip rather than fail, so a source export without history still gives a green
+  suite.'
+- 'Attempt 1 produced a correct tool that failed the gate for an environment reason,
+  not a code reason: the gate clones the branch with `git clone /src /tmp/w`, which
+  copies refs/heads/* only, so `origin/main` did not exist there and `git merge-base
+  HEAD origin/main` aborted. The orchestrator now carries refs/remotes/origin/* into
+  the gate clone, so origin/main resolves. The attempt counter was reset because of
+  that; this is a fresh first attempt. Do not depend on a single ref layout all the
+  same: resolve the default revision through the candidates origin/main, refs/remotes/origin/main,
+  main in that order, use the first that `git rev-parse --verify` accepts, and only
+  then exit with the clear message. Keep the explicit --rev override and keep the
+  test skipping (not failing) when no candidate resolves.'
+- 'attempt 1: reviewer said revise: The tool itself is correct — I verified independently
+  that `materialize_revision` exports the arming revision''s src (content matches
+  `git show b6da8dd:src/url_heuristics.py` and differs from the working tree), and
+  that the replay subprocess is genuinely isolated (deleting the exported src/ makes
+  it fail with ModuleNotFoundError rather than falling back to the repo). Scope, paths,
+  offline-ness and dependency hygiene are all clean. One real test gap and two nits:
+
+
+  1. (blocking) No test pins the tool''s central guarantee: that it replays OLD src
+  rather than the current tree. '
+- 'attempt 2: reviewer said revise: The tool is right and I verified it independently:
+  default rev resolves to b6da8dd (origin/main == merge-base HEAD origin/main today),
+  `materialize_revision` exports that revision''s src/ (matches `git show b6da8dd:src/url_heuristics.py`,
+  differs from the working tree, which carries T-0006''s 71-line change), the replay
+  subprocess runs with cwd=<tmpdir> so it imports the exported src/ and the *current*
+  evals/, offline_eval''s default path writes report.json and never does the baseline
+  check (so a worse --rev won''t spuriously error), stdlib only, no network, no secrets,
+  no pr'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0011
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Re-derive the arming baseline by replaying the corpus against the arming revision
+why: evals/baseline.json is frozen against today's 23-record corpus, so any corpus
+  change silently invalidates the G2 comparison and the only alternative is re-recording
+  the baseline from already-improved code, which would erase the improvement it is
+  supposed to measure. A tool that materialises src/ from a git revision and replays
+  the current corpus through the current harness makes the arming baseline re-derivable
+  at any time.
+acceptance:
+- uv run python -m evals.rebaseline --corpus evals/fixtures
+- uv run pytest -q tests/test_rebaseline.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/rebaseline.py
+- tests/test_rebaseline.py
+- README.md
+protected_paths:
+- evals/baseline.json
+- evals/fixtures/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/offline_eval.py
+- evals/profiles.py
+- src/**
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 0
+park_reason: 'reviewer said revise: The tool is right and I verified it independently:
+  default rev resolves to b6da8dd (origin/main == merge-base HEAD origin/main today),
+  `materialize_revision` exports that revision''s src/ (matches `git show b6da8dd:src/url_heuristics.py`,
+  differs from the working tree, which carries T-0006''s 71-line change), the replay
+  subprocess runs with cwd=<tmpdir> so it imports the exported src/ and the *current*
+  evals/, offline_eval''s default path writes report.json and never does the baseline
+  check (so a worse --rev won''t spuriously error), stdlib only, no network, no secrets,
+  no pr'

@@ -1,0 +1,12 @@
+# No change: HEAD is still c53d325, all goals remain met, and no work is scheduled
+
+_Recorded 20260923-225837 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty. There are no worker followups and no newly completed tasks since the last pass. `git log` in /repo/job-application-agent still shows HEAD at c53d325 (T-0043), the same tree that decision 20260923-225721 checked in full. On that tree the harness exited 0 with 1.000 on all five metrics against the arming baseline in evals/baseline.json (posting_shape 0.815, aggregator_drop 0.765, location_match 1.000, staleness 0.429, dedup 0.571), `--check-baseline` exited 0, `uv run pytest -q` gave 347 passed and 1 skipped, and run_mock_test.py passed. I could not re-run the harness in this pass. I copied the read-only mount to /tmp and tried `uv run --offline`, which failed while building the environment because numpy 2.4.2 (a transitive dependency via botasaurus) was not in the local uv cache. I did not retry with network access or work around the failure. Every parked task (T-0007 through T-0040) has been superseded by a re-issue that has since merged.
+
+## Decision
+Add no tasks, revive no parked tasks and add no milestones. Assumptions, recorded because the human cannot be asked: (1) HEAD is unchanged and the gates are deterministic, so I carried forward the last results that were verified on c53d325. This pass did not confirm them again, because the local environment could not be built offline. (2) The charter allows idle work but does not require it. With no followup, no new fixture and no new commit, speculative idle tasks would only add churn. (3) I made no live Brave or OpenRouter calls. They cost real money and are not needed to confirm goals that are already met. (4) M1 to M3 still show 'planned' because no op can change a milestone's status. I left them as they are rather than add duplicate milestones.
+
+## Consequences
+Workers stay idle, and nothing changes for the merge gates or live-API spend. A future pass should schedule work only when new evidence arrives: a new commit, a worker followup, a new recorded run or fixture that shows a miss, or a user-visible message path found without a content assertion. Any such work must stay within the charter's allowed idle work. For planners: this pass could not build an environment with `uv run --offline` because the uv cache has no numpy wheel. Future passes should expect to rely on the merge gates' own runs rather than re-verifying locally.

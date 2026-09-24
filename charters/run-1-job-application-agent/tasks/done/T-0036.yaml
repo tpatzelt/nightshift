@@ -1,0 +1,61 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- In the meinestadt.de branch of src/url_heuristics.py (around line 308), accept only
+  `jk` as the posting segment. Remove `jkl` from the tuple and update the comment
+  to say that /jkl/ is a category listing. Change no other vendor branch.
+- Add a test in tests/test_url_heuristics.py asserting that https://jobs.meinestadt.de/berlin/jkl/0-15777-15833
+  is not classified as a posting. It must fail on the current code. The existing /deutschland/jk/0-15711-96171
+  posting test must keep passing.
+- Run `python -m evals.offline_eval` before and after the change and put both TOTAL
+  rows in the commit message. posting_shape_rate and aggregator_drop_rate should rise
+  and nothing may fall. Do not edit evals/baseline.json or any fixture.
+- Offline only. No live API call is needed, because the record is already captured.
+  No new dependencies.
+created: 2026-09-23T18:01:30+0200
+max_diff_lines: 80
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0036
+project: job-application-agent
+charter_goal: G2
+roadmap_ref: M2
+title: Stop treating meinestadt /<location>/jkl/<id> category pages as postings
+why: 'Allowed idle work inside G2. G2''s definition of done is already met: replaying
+  today''s tree in a scratch copy gives posting_shape_rate 0.889 against the arming
+  0.815, and aggregator_drop_rate 0.882 against 0.765, with no metric regressing.
+  The planner decided on 2026-09-23 (decision 20260923-180053) to schedule this task,
+  but it never reached /plan/backlog, so it is re-issued here. The problem: src/url_heuristics.py:308-309
+  classifies meinestadt `/<location>/jkl/<id>` as POSTING. The labelled record evals/fixtures/project-manager-berlin.jsonl:4
+  (https://jobs.meinestadt.de/berlin/jkl/0-15777-15833, titled ''571 Stellenangebote'',
+  label kind=index, aggregator=true) is a category listing. That record is one of
+  the two misses left in the project-manager-berlin profile (posting_shape 0.500,
+  aggregator_drop 0.750). The existing test for /deutschland/jk/0-15711-96171 (tests/test_url_heuristics.py:199)
+  shows that `/jk/` is the real posting shape, so it must stay a POSTING.'
+acceptance:
+- uv run pytest -q tests/test_url_heuristics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --check-baseline
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- src/bot_service.py
+- src/telegram_api.py
+- tests/test_eval_corpus.py
+- tests/test_run_quality.py
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+merged_sha: 8f821e6
+merged_at: 2026-09-23T18:05:13+0200

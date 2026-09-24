@@ -1,0 +1,64 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Tests only. Add tests to tests/test_intake.py and reuse its existing fixtures and
+  helpers (_msg, the store and the fake extractor). Change no source file. src/**
+  is protected so no user-visible behaviour can change silently.
+- Assert each reply in the 'why' list through IntakeManager.handle_message, not by
+  calling private helpers. Use a stable substring and, where it matters, the state
+  transition. For the question counter, cover both '1 question left' and 'N questions
+  left'.
+- If a reply turns out to be wrong (for example a broken plural or a prompt that names
+  the wrong command), do not fix src/. Add a strict xfail test that describes the
+  expected text and report it as a followup, so the fix can become its own small G3
+  task.
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. TELEGRAM_BOT_TOKEN is
+  absent by design.'
+- Do not reformat or reorder the existing tests (charter non-goal).
+created: 2026-09-23T23:08:33+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0045
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the content of every onboarding reply still unasserted in tests/test_intake.py
+  (re-issue of planned T-0044, which never reached the backlog)
+why: 'G3''s definition of done says every user-visible message path must have a test
+  asserting its content. IntakeManager.handle_message (src/intake.py) returns text
+  that bot_service._dispatch sends to users. At c53d325, tests/test_intake.py asserts
+  only the welcome, ''Got your CV'', ''all set'', the /reset reply, ''Setup in progress'',
+  the document-error reply, the too-short-paste reply and the question texts. These
+  replies are sent to users but nothing asserts their content: the ''✅ Motivation
+  letter received.'' reply plus the job-prefs prompt (src/intake.py:165, :337), the
+  job-prefs prompt after /skip (:160), ''Please answer in a short text message.''
+  (:181), the ACTIVE-state chat reply (:193), the /start reply when already ACTIVE
+  (:127), the ''I need a bit more information.'' lead-in (:216), the ''❓ (N question(s)
+  left)'' counter and its singular/plural wording (:333), and the _prompt_for_state
+  motivation/fallback prompts shown through /status and /start (:348-354). The last
+  planner pass planned this as T-0044, but it never appeared in /plan/backlog, so
+  it is re-issued here unchanged in scope.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+allowed_paths:
+- tests/test_intake.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_bot_service.py
+- tests/test_notifier.py
+- tests/test_telegram_api.py
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: ee6a912
+merged_at: 2026-09-23T23:13:03+0200

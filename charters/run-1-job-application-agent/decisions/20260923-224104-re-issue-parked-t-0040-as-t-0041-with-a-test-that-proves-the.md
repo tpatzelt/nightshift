@@ -1,0 +1,12 @@
+# Re-issue parked T-0040 as T-0041 with a test that proves the landing gate
+
+_Recorded 20260923-224104 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty. G3's definition-of-done items are covered by merged tasks: T-0010 (why a job matched), T-0016 and T-0032 (actionable scan-failure text), T-0024 and T-0035 (never notify twice), and T-0033 and T-0034 (remaining send-boundary content). G1's harness, tests and README metric docs are merged. I replayed the committed corpus on the current tree. Against the arming baseline (posting_shape 0.815, aggregator_drop 0.765, location 1.0, staleness 0.429, dedup 0.571), the current TOTAL row is posting_shape 0.941, aggregator_drop 0.941, and 1.000 on the other three metrics. That already beats the baseline with no regression. The one remaining miss is the WhatJobs landing page de.whatjobs.com/jobs?id=261276305, which classify_url treats as POSTING. find_landing_marker (T-0039) detects it but has no caller yet. T-0040 wired it in, and the reviewer approved the code but sent the task back because the replay_keep test did not show that a POSTING-shaped URL with landing text is dropped by the new gate specifically.
+
+## Decision
+Re-issue T-0040 as T-0041 with depends_on: []. The scope is unchanged: gates in the orchestrator and in replay_keep, a skipped_landing counter label, and the ImportError fallback for rebaseline.py. The task now spells out the test the reviewer asked for: a posting-labelled, POSTING-shaped URL with landing text is dropped, and the same URL with ordinary posting text is kept. It also adds an orchestrator test showing a landing page never reaches evaluate_job. allowed_paths lists only files that exist. The fixtures and evals/baseline.json are protected so the measure cannot be moved to fit the change. Assumptions (conservative): the other parked tasks are superseded by merged work and stay parked; I added no G3 work because every G3 definition-of-done item already maps to a merged task; and I did not spend any live Brave or OpenRouter calls, since the offline replay already pinpoints the miss.
+
+## Consequences
+When T-0041 merges, the harness should show posting_shape_rate and aggregator_drop_rate at 1.000, with no metric regressing, which meets G2's definition of done on the current corpus. After that, the backlog should hold only the charter's allowed idle work (tests, docs and small refactors within G1–G3). If T-0041 is parked again, the next pass should split it: the replay gate and its test first, then the orchestrator gate, rather than widening scope.

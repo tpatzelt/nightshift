@@ -1,0 +1,71 @@
+depends_on:
+- T-0008
+- T-0010
+- T-0016
+new_tests_required: true
+attempts: 0
+notes:
+- 'Keep the ledger inside TelegramNotifier so the fix stays in the three modules G3
+  names: an optional ledger_path constructor argument, default None meaning today''s
+  behaviour. notify_results filters out results whose canonical_url is already in
+  the ledger, and records a URL only after its message actually sent (the bool from
+  _send) - so a Telegram outage leaves the job unnotified and retryable rather than
+  silently swallowed. Wire it at the two construction sites: src/bot_service.py:269
+  derives the path as paths[''cache_path''].parent / ''notified.json'' (do not add
+  a key to user_store.crawl_paths - src/user_store.py is protected), and src/main.py:43
+  puts it next to config.cache_path. Store JSON; create on demand; an unreadable or
+  corrupt ledger logs a warning and reads as empty, never raises, because a notifier
+  failure must not break a crawl. Use src.url_heuristics.canonical_url for the key
+  so the ledger and the cache agree after T-0008. Tests: two runs over the same result
+  notify once; a result whose send returned False is not recorded and IS re-sent next
+  run; a corrupt ledger file degrades to empty without raising; the reason line added
+  by T-0010 still appears. No live Telegram call - monkeypatch requests.post as the
+  existing tests do.'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0015
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: 'Never notify twice: a durable ledger of delivered postings'
+why: Orchestrator._notify (src/orchestrator.py:272) discards the bool notify_results
+  returns and the seen-URL cache is written before notification (src/orchestrator.py:230),
+  so a posting whose send failed is marked seen and never re-sent, while a lost or
+  re-keyed cache announces the same posting again - and T-0008 deliberately changes
+  canonical_url, so existing cache.json keys stop matching on the next run. G3 requires
+  that a job already notified is provably not notified again.
+acceptance:
+- uv run pytest -q tests/test_notify_ledger.py
+- uv run pytest -q tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/notifier.py
+- src/bot_service.py
+- src/main.py
+- tests/test_notifier.py
+- tests/test_notify_ledger.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/url_heuristics.py
+- src/page_signals.py
+- src/crawler_engine.py
+- src/telegram_api.py
+- src/user_store.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 8
+park_reason: 'Unreachable and superseded. depends_on includes T-0008, which is parked,
+  so the ''never notify twice'' work — a G3 definition-of-done item — sat behind a
+  stalled G2 chain. Re-issued as T-0024 with depends_on: [] (its other two dependencies,
+  T-0010 and T-0016, are merged) and with the construction-site citations corrected
+  to src/bot_service.py:296 and src/main.py:43.'

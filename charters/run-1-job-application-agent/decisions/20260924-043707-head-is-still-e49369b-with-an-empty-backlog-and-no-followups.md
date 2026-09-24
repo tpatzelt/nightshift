@@ -1,0 +1,12 @@
+# HEAD is still e49369b with an empty backlog and no followups, so no tasks are added
+
+_Recorded 20260924-043707 by the NIGHTSHIFT planner._
+
+## Context
+I checked the tree read-only. /repo/job-application-agent is still at e49369b (T-0058), the same revision the last five planner passes checked. At that revision earlier passes re-ran every gate on a writable copy and recorded the results. G1: `python -m evals.offline_eval` exits 0, prints the per-metric table, writes evals/runs/offline/report.json, has tests that fail when a metric is miscomputed, and is documented in the README. G2: the TOTAL row scores 1.000 on all five metrics. The arming baseline in evals/baseline.json (rev b6da8dd) is 0.815, 0.765, 1.000, 0.429 and 0.571, so posting-shape and aggregator-drop rates improved and no metric regressed. G3: every message path has a test asserting its content, the notify ledger stops a posting being sent twice, and scan and delivery failures produce text that names what failed. pytest gave 382 passed, 1 skipped. This pass I could not re-run the gates: `uv run --offline` in a /tmp copy failed because the dependency wheels (numpy, hf-xet) are not in the local uv cache. There are no worker followups, and every parked task has been re-issued and merged or superseded.
+
+## Decision
+I added no tasks, milestones or reorders. I made no live Brave or OpenRouter calls because no open question needed one. I also did not try to fetch the dependencies to re-run the gates: HEAD has not moved, so that would add nothing and would spend network for no reason. I took three assumptions, choosing the conservative reading each time. (1) With HEAD unchanged, the gate results earlier passes verified still hold. (2) The charter allows idle work only to close a concrete gap within G1-G3, and none has been shown, so no idle work is scheduled. (3) M1-M3 still read 'planned' only because none of the allowed ops can change a milestone's status.
+
+## Consequences
+The runners stay idle. A later pass should schedule work only if HEAD moves, a followup arrives or a gate regresses. Tim should mark M1-M3 as done in ROADMAP.md by hand. One known weakness is carried forward: --check-baseline compares against the arming values, so it would not catch a partial slide down from 1.000 that stays above them. The per-metric replay tests in the merge gate cover that case. A future pass that needs to re-verify gates must have the uv dependency cache available, because offline `uv run` cannot build the environment from a fresh copy.

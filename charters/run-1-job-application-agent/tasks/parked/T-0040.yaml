@@ -1,0 +1,88 @@
+depends_on:
+- T-0039
+new_tests_required: true
+attempts: 2
+notes:
+- 'src/orchestrator.py: in _process_url, directly after the find_stale_marker gate
+  (around line 437), add the same shape of gate. Call find_landing_marker(job_text),
+  log it, run self._report.count(''skipped_landing'') and seen_urls.add(url), then
+  return False.'
+- 'src/run_report.py: add ''skipped_landing'': ''search/landing page, not a posting''
+  to COUNTER_LABELS directly after skipped_stale, so the run summary shows readable
+  text instead of the raw key.'
+- 'evals/offline_eval.py replay_keep: add the matching check directly after find_stale_marker
+  (line 94) so the replay keeps production order. Update the module docstring''s gate
+  list if it lists the gates.'
+- 'Tests: in tests/test_offline_eval.py, a replay_keep test that fails without the
+  change: a POSTING-shaped URL with the landing text is not kept. In tests/test_location_and_freshness.py,
+  a test modelled on test_stale_posting_skipped_without_scoring: a landing page is
+  fetched but never reaches evaluate_job, and orchestrator._report counts skipped_landing.'
+- Run `uv run python -m evals.offline_eval --out <tmpdir>` before and after the change
+  and put both TOTAL rows in the commit message. Do not edit evals/baseline.json or
+  any fixture, because relabelling the record would not count as a fix.
+- Offline only, no new dependencies.
+- "attempt 1: gate failures:\n  - worker reported status=None, not 'done'"
+- 'attempt 2: reviewer said revise: The production change and the replay change are
+  correct and in scope. They match the order of the stale gate, add the skipped_landing
+  counter and label, and the commit message reports the before and after TOTAL rows
+  (posting_shape and aggregator_drop both 0.941 -> 1.000, nothing regressed). The
+  try/except ImportError fallback around find_landing_marker is justified: evals/rebaseline.py
+  replays against origin/main''s src, which predates the function. The problem is
+  the new replay_keep test. The task requires ''a POSTING-shaped URL with the landing
+  text is not kept'' and a tes'
+created: 2026-09-23T22:20:32+0200
+max_diff_lines: 200
+timeout_min: 35
+max_turns: 45
+status: parked
+id: T-0040
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Drop landing pages in the orchestrator and in the offline replay (second slice
+  of parked T-0038)
+why: 'This slice closes the last G2 headroom the corpus can show. Once T-0039 has
+  added find_landing_marker, applying it where the stale gate runs drops https://de.whatjobs.com/jobs?id=261276305
+  (project-manager-berlin.jsonl line 5). That should raise TOTAL posting_shape_rate
+  and aggregator_drop_rate from 0.941 to 1.000 with no metric falling (replay of HEAD
+  8f821e6 on 2026-09-23). The production path and the harness replay must change together:
+  a harness-only change would measure logic that is never used in production.'
+acceptance:
+- uv run pytest -q tests/test_offline_eval.py tests/test_location_and_freshness.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --check-baseline
+allowed_paths:
+- src/orchestrator.py
+- src/run_report.py
+- evals/offline_eval.py
+- tests/test_offline_eval.py
+- tests/test_location_and_freshness.py
+protected_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- evals/metrics.py
+- evals/corpus.py
+- src/url_heuristics.py
+- src/page_signals.py
+- tests/test_url_heuristics.py
+- tests/test_eval_corpus.py
+- tests/test_offline_baseline.py
+- tests/test_run_quality.py
+- src/notifier.py
+- src/bot_service.py
+- src/telegram_api.py
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+park_reason: 'reviewer said revise: The production change and the replay change are
+  correct and in scope. They match the order of the stale gate, add the skipped_landing
+  counter and label, and the commit message reports the before and after TOTAL rows
+  (posting_shape and aggregator_drop both 0.941 -> 1.000, nothing regressed). The
+  try/except ImportError fallback around find_landing_marker is justified: evals/rebaseline.py
+  replays against origin/main''s src, which predates the function. The problem is
+  the new replay_keep test. The task requires ''a POSTING-shaped URL with the landing
+  text is not kept'' and a tes'

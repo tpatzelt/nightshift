@@ -1,0 +1,12 @@
+# HEAD is still 65c3351 with an empty backlog and no followups, so this pass schedules no work
+
+_Recorded 20260924-045633 by the NIGHTSHIFT planner._
+
+## Context
+This pass reviewed a read-only copy of /repo/job-application-agent. HEAD is still 65c3351, the T-0060 merge. The last commit touching tracked files is the same one that decisions 20260924-045551 and 20260924-045610 already checked, so there is no new input. The backlog has no ready tasks and there are no worker followups. The done set runs from T-0001 to T-0060 and includes every re-issue of the parked chain: T-0019->T-0026, T-0020->T-0027, T-0021->T-0028, T-0022->T-0029, T-0023->T-0030, T-0015->T-0024, T-0025/T-0031->T-0032..T-0034, T-0038/T-0040->T-0039/T-0042 and T-0048->T-0049. So every parked task has been either merged under a later ID or superseded. Earlier passes recorded these results on this same HEAD. G1: offline_eval exits 0, prints the metric table and writes report.json, and it has tests and README coverage. G2: all five metrics are at 1.000. The arming baseline in evals/baseline.json was posting_shape 0.815 and aggregator_drop 0.765, and no metric regressed. G3: messages give a Why: line, a durable ledger plus in-batch dedup prevents repeat notifications, and the failure texts are asserted at the send boundary. pytest gave 382 passed, 1 skipped.
+
+## Decision
+No ops. The charter allows idle work only for tests, docs and small refactors strictly within G1-G3, and says 'Nothing new'. Nothing has changed since the last pass, so there is no concrete gap to schedule. Assumption 1: I did not re-run the gates this pass. The sandbox has no network, so `uv run --offline` could not build a fresh venv (numpy is not in the uv cache). The code is byte-identical to the HEAD that earlier passes found green, so I relied on their results rather than working around the sandbox. Assumption 2: parked tasks stay parked, because reviving any of them would duplicate merged work. Assumption 3: ROADMAP.md still says 'planned' for M1-M3. No op in the schema changes a milestone's status, so I left them as they are.
+
+## Consequences
+The backlog stays empty. No worker time and no live Brave or OpenRouter quota is spent. A later pass should schedule work only if new input appears: a new HEAD, a worker followup, a fixture under evals/fixtures/** that scores below 1.000, or a failing gate. When the human returns, they should mark M1-M3 done in ROADMAP.md. They may also want to reduce the repeated no-op planner passes: the decisions directory now holds 186 records.

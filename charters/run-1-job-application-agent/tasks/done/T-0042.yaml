@@ -1,0 +1,94 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'src/orchestrator.py: in _process_url, directly after the find_stale_marker gate
+  (line 437-442), add a gate of the same shape. Call find_landing_marker(job_text),
+  log the URL and the marker, call self._report.count(''skipped_landing'') and seen_urls.add(url)
+  the same way the stale gate does, then return False. Import find_landing_marker
+  next to find_stale_marker on line 15.'
+- 'src/run_report.py: add ''skipped_landing'': ''search/landing page, not a posting''
+  to COUNTER_LABELS directly after skipped_stale (line 26).'
+- 'evals/offline_eval.py replay_keep: add `if find_landing_marker(record.text): continue`
+  directly after the find_stale_marker check, so the replay runs the gates in the
+  same order as production. Import it with a try/except ImportError fallback that
+  returns None, because evals/rebaseline.py replays against an older src that does
+  not have the function. Update the docstring''s list of gates if it has one.'
+- 'REQUIRED replay test (the reason T-0040 was parked): in tests/test_offline_eval.py,
+  build two records that differ ONLY in text. Both use the same POSTING-shaped URL
+  (for example https://de.whatjobs.com/jobs?id=261276305), both have http_status 200
+  and no redirect, both are labelled kind=posting, and both texts mention Berlin so
+  the location gate passes. Record A''s text is the landing boilerplate, containing
+  at least two of the find_landing_marker phrases plus ''Berlin''. Record B''s text
+  is an ordinary posting that mentions Berlin. Assert replay_keep([A], BERLIN) ==
+  [] and replay_keep([B], BERLIN) == [B]. Before you commit, check locally that assertion
+  A fails when the new gate line is commented out. Say in the commit message that
+  you checked this.'
+- 'REQUIRED orchestrator test: in tests/test_location_and_freshness.py, model a test
+  on test_stale_posting_skipped_without_scoring (line 68). A POSTING-shaped URL whose
+  fetched text is landing boilerplate is fetched but never reaches evaluate_job, and
+  orchestrator._report counts skipped_landing == 1.'
+- 'Run `uv run python -m evals.offline_eval --out <tmpdir>` before and after the change,
+  and put both TOTAL rows in the commit message. Expected result: posting_shape and
+  aggregator_drop go from 0.941 to 1.000 and no metric falls. That is a prediction,
+  so report what you actually observe.'
+- Do not edit evals/baseline.json, any fixture, src/page_signals.py or src/url_heuristics.py.
+  Relabelling the record or changing the detector does not count as a fix. Offline
+  only, no live calls, no new dependencies.
+created: 2026-09-23T22:43:01+0200
+max_diff_lines: 250
+timeout_min: 35
+max_turns: 45
+status: done
+id: T-0042
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Drop landing pages in the orchestrator and in the offline replay, with a test
+  that only the new gate can pass (re-issue of parked T-0040; planned T-0041 never
+  reached the backlog)
+why: This is the last G2 headroom the corpus shows. On HEAD b7f718e the replay TOTAL
+  row is posting_shape_rate 0.941 and aggregator_drop_rate 0.941. The arming baselines
+  are 0.815 and 0.765, and the other three metrics are at 1.000. Both misses come
+  from one record, https://de.whatjobs.com/jobs?id=261276305 at evals/fixtures/project-manager-berlin.jsonl
+  line 5. T-0039 merged find_landing_marker in src/page_signals.py:139, which detects
+  that record, but nothing calls the function yet. T-0040 wired it in, and the reviewer
+  approved both the production change and the replay change, including the try/except
+  ImportError fallback needed by evals/rebaseline.py. T-0040 was parked only because
+  its replay_keep test would still pass with the gate removed. Two planner passes
+  issued this work as T-0041, but that task never reached the backlog, so it is issued
+  here under a fresh id.
+acceptance:
+- uv run pytest -q tests/test_offline_eval.py tests/test_location_and_freshness.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --check-baseline
+allowed_paths:
+- src/orchestrator.py
+- src/run_report.py
+- evals/offline_eval.py
+- tests/test_offline_eval.py
+- tests/test_location_and_freshness.py
+protected_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- evals/metrics.py
+- evals/corpus.py
+- src/url_heuristics.py
+- src/page_signals.py
+- tests/test_url_heuristics.py
+- tests/test_eval_corpus.py
+- tests/test_offline_baseline.py
+- tests/test_run_quality.py
+- tests/test_page_signals.py
+- src/notifier.py
+- src/bot_service.py
+- src/telegram_api.py
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 017296a
+merged_at: 2026-09-23T22:49:08+0200

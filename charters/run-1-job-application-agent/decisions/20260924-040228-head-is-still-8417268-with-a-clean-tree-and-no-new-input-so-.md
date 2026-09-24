@@ -1,0 +1,12 @@
+# HEAD is still 8417268 with a clean tree and no new input, so this pass schedules nothing
+
+_Recorded 20260924-040228 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-24 the backlog had 0 ready tasks and there were no worker followups. /repo/job-application-agent is still at 8417268 (T-0053) and `git status` is clean. That is the same HEAD the planner passes at 20260924-035938 and 20260924-040205 checked. Those passes ran the checks on a scratch copy. `uv run python -m evals.offline_eval` exited 0, printed the table and wrote evals/runs/offline/report.json. Every TOTAL metric was 1.000 on the 58 records. The arming baseline in evals/baseline.json is posting_shape 0.815, aggregator_drop 0.765, location 1.000, staleness 0.429 and dedup 0.571, so both required metrics improved and none regressed. `uv run pytest -q` gave 369 passed, 1 skipped, against 182 passed, 1 skipped at arming. `uv run python run_mock_test.py` passed. For G3, merged tasks cover the definition of done. Message content is asserted at the send boundary (T-0032, T-0033, T-0034, T-0045). The notified.json ledger (T-0024) and in-list dedup (T-0035) stop repeat notifications. Why: lines come from T-0046. Delivery failures (T-0049) and missing CV or preferences (T-0052) produce messages that name the problem. Every parked task has a merged re-issue that supersedes it.
+
+## Decision
+Emit no ops. No task is added, no parked task is revived and no milestone changes. This pass did not re-run the suites. The code has not changed since the last verified pass, and the merge gates are deterministic by charter, so re-running would only spend time. Assumption, recorded because no human can confirm it: once every definition of done is verifiably met and nothing has changed, the most conservative reading of the charter is to schedule no idle work. Filler tasks would add churn the charter forbids.
+
+## Consequences
+Workers stay idle and spend no budget. This pass made no live Brave, OpenRouter or Telegram calls. If HEAD moves, or if pytest, run_mock_test.py or `offline_eval --check-baseline` fails, the next pass should add one small fix task tied to the goal that broke. ROADMAP still shows M1-M3 as 'planned' because no allowed op can mark a milestone done, so the human should update them on return. Every metric now scores 1.000 on the current corpus, so the harness can no longer measure any further G2 improvement.

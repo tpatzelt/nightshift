@@ -1,0 +1,104 @@
+depends_on:
+- T-0026
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add roughly 20-30 records to the existing three fixture files or to new *.jsonl
+  files whose stem is already a profile name in evals/profiles.py - project-manager-berlin,
+  data-engineer-amsterdam and food-product-manager-berlin are defined but unused.
+  Do not edit evals/profiles.py (protected): an unknown stem makes locations_for()
+  return [] and location_match_rate meaningless.'
+- 'Five categories. (1) Postings on ATS vendors _ats_kind does not know (bamboohr.com,
+  teamtailor.com, softgarden.io/.de, jobvite.com, breezy.hr, applytojob.com, icims.com,
+  taleo.net, pinpointhq.com, hire.withgoogle.com) PLUS each vendor''s board root labelled
+  listing - after T-0026 those board roots are what gives posting_shape_rate its headroom,
+  because arming src classifies them POSTING (digit shape) and keeps them, while T-0028
+  will classify them LISTING and drop them. (2) Non-postings with digit-shaped paths:
+  /careers/2024/, /blog/2019/, /jobs/page/2, labelled listing or index. (3) Aggregator
+  INDEX pages on the twelve hosts T-0006 actually added - stellenanzeigen.de, stellenmarkt.de,
+  meinestadt.de, jobware.de, absolventa.de, jobvector.de, talent.com, careerjet.,
+  neuvoo., simplyhired., whatjobs.com, jobsora. - labelled aggregator index. Do NOT
+  use kununu.com or devjobs.de: both were already in AGGREGATOR_HOSTS at the arming
+  revision (verify with `git show b6da8dd:src/url_heuristics.py`), so they buy zero
+  aggregator-drop headroom. (4) Near-duplicate pairs differing only by scheme, a leading
+  www., or query-parameter order, with duplicate_of set. (5) Postings closed with
+  the wordings T-0009 targets, English and German, labelled stale.'
+- Labels are ground truth read off the page. Never generate a label from classify_url,
+  is_aggregator_url or find_stale_marker - that makes the metrics tautological. Give
+  every record realistic page text including the location as a real page states it,
+  so location_match_rate stays honest.
+- 'The charter invites live validation: a small, budgeted number of real Brave searches
+  to source genuine URL shapes and page text is in scope. Keep exploratory runs tiny,
+  never loop a live search in a test, respect [tool.job_crawler.budget], and never
+  write a key into a fixture, a log or a commit. If the twelve category-3 hosts cannot
+  be sourced live within budget, say so in the output rather than padding with hosts
+  arming already handled.'
+- 'Re-freeze with `uv run python -m evals.rebaseline --corpus evals/fixtures --out
+  evals/baseline.json`: the baseline must come from ARMING src (b6da8dd), never from
+  the current tree. The tool writes the resolved absolute corpus path into the baseline''s
+  corpus_dir field; hand-edit that one field back to "evals/fixtures" - nothing reads
+  it, only totals.metrics is compared. Put the arming-vs-current delta table in the
+  task output.'
+- Then run `uv run python -m evals.offline_eval --check-baseline` and report its exit
+  status and any below-baseline metric in the output - it is deliberately NOT an acceptance
+  gate here, because a corpus that honestly exposes a current-code regression would
+  otherwise fail its own gate for something this task is forbidden to fix (src/**
+  is protected, corpus softening is banned). If a metric is below arming, keep the
+  records, name them in a followup, and say so.
+- 'tests/test_eval_corpus.py is the only test file in scope: extend it so the new
+  records are load-validated (every label key present, kind in VALID_KINDS, duplicate_of
+  pointing at a URL that exists in the same profile). Note that T-0026 rewrote tests/test_rebaseline.py''s
+  totals assertion to read evals/baseline.json, so re-freezing no longer breaks it
+  - if you find it still hard-codes 23/12/0.750, T-0026 did not land as specified;
+  report that rather than editing the file (it is protected here).'
+created: 2026-09-23T12:08:03+0200
+max_diff_lines: 400
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0027
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Extend the labelled corpus with the URL shapes the code actually gets wrong,
+  then re-freeze the baseline (supersedes parked T-0020)
+why: 'The corpus is 23 records and every metric except dedup_rate is already saturated
+  at the arming revision. I replayed it today to be sure: with T-0026''s posting-only
+  kept semantics, ARMING src scores posting_shape 1.000, aggregator_drop 1.000, location_match
+  1.000, staleness 1.000, dedup 0.750. G2''s definition of done requires improvement
+  on posting-shape rate AND aggregator-drop rate, so on this corpus G2 is arithmetically
+  impossible to demonstrate, and T-0006''s aggregator widening provably moved nothing.
+  The harness can only measure quality if the corpus contains the shapes the deterministic
+  logic gets wrong. Re-issues parked T-0020, which was gated on parked T-0019.'
+acceptance:
+- uv run python -m evals.offline_eval
+- uv run python -m evals.rebaseline --corpus evals/fixtures --out evals/baseline.json
+- uv run pytest -q tests/test_eval_corpus.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- tests/test_eval_corpus.py
+- README.md
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/offline_eval.py
+- evals/rebaseline.py
+- evals/profiles.py
+- tests/test_offline_metrics.py
+- tests/test_offline_eval.py
+- tests/test_offline_baseline.py
+- tests/test_rebaseline.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 1
+merged_sha: a85eccb
+merged_at: 2026-09-23T12:37:07+0200

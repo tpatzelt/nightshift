@@ -1,0 +1,59 @@
+depends_on:
+- T-0007
+new_tests_required: true
+attempts: 0
+notes:
+- 'In canonical_url: normalise the scheme to https for http URLs, strip a leading
+  www. from the host, and sort the surviving query pairs before urlencode so parameter
+  order stops mattering. Keep a non-default port, keep the existing tracking-param
+  and /apply handling, keep returning the input unchanged for a URL with no scheme.
+  Do not touch callers - Orchestrator._load_cache, _new_urls, _triage_urls and _merge_with_previous
+  already route through canonical_url, and tests/test_run_quality.py::test_same_posting_behind_tracking_params_is_fetched_once
+  must stay green unedited, which is why it is protected. Note the consequence in
+  the task output: an existing on-disk cache.json written with old keys will not match
+  new keys, so the first run after this change may re-check some already-seen postings
+  once; that is acceptable and self-healing, but say so. The acceptance run must show
+  dedup_rate strictly above baseline with no metric below it.'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0008
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Canonicalise host, scheme and query order so duplicates collapse
+why: canonical_url in src/url_heuristics.py:62 strips tracking params and /apply but
+  keeps the scheme, the www. prefix and the original query order, so http://www.x.com/jobs/1
+  and https://x.com/jobs/1?a=1&b=2 vs ?b=2&a=1 are three cache keys for one posting
+  - the same job gets fetched, scored and notified more than once.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_dedup_canonical.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_dedup_canonical.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 4
+park_reason: 'Unreachable and superseded. It still carries depends_on: [T-0007], and
+  T-0007 is parked, so it has never been pickable; two passes tried to repoint it
+  with update_task and neither took effect in the tree. Re-issued as T-0023 with the
+  dedup headroom verified by replay: the pair http://jobs.lever.co/brightloop/<uuid>
+  vs https://www.jobs.lever.co/brightloop/<uuid> is the one labelled duplicate that
+  does not collapse today, which is exactly why dedup_rate sits at 0.750.'

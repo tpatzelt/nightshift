@@ -1,0 +1,67 @@
+depends_on:
+- T-0032
+new_tests_required: true
+attempts: 0
+notes:
+- Change tests only. src/** is protected. If a path cannot be asserted without changing
+  source, report a followup and do not edit src.
+- '''At the send boundary'' means the same as in T-0032: monkeypatch src.telegram_api.requests.post
+  and assert on the text field of the JSON payload. Reuse the fake-post helper T-0032
+  adds if it exists.'
+- Do not stub the intake handlers. Drive svc._dispatch(IncomingMessage(...)) against
+  a real UserStore under tmp_path, and seed state through svc._store where a branch
+  needs it. For HELP_TEXT and WELCOME, compare against the constants imported from
+  src.intake rather than retyping them.
+- '(c) must not construct Orchestrator, LLMService or CrawlerEngine for real. The
+  simplest route is to test the four _empty_scan_explanation branches directly with
+  RunReport counters (pages_fetched=0 with already_seen>0, pages_fetched=0 with already_seen=0,
+  pages_fetched>0 with no skipped_/rejected_ counters, pages_fetched>0 with one).
+  Then add one send-boundary test showing that _run_scan''s no-new-jobs message starts
+  with ''\U0001f50d Scan finished - no new matching jobs this time.'' and ends with
+  the explanation line. For that test, monkeypatch src.bot_service.Orchestrator, LLMService
+  and CrawlerEngine with fakes: the fake Orchestrator''s run() returns [] and exposes
+  last_report.'
+- In your output, map each of (a), (b) and (c) to the test names that assert it.
+- No network, no real sleep, no dependence on TELEGRAM_BOT_TOKEN.
+created: 2026-09-23T17:31:47+0200
+max_diff_lines: 250
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0033
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert intake, /run and no-new-jobs replies at the Telegram send boundary (second
+  slice of parked T-0031)
+why: 'G3 requires a content assertion for every user-visible message path. In both
+  T-0025 reviews and T-0031 attempt 1, reviewers approved these assertions, but the
+  work was never merged because it was bundled with the scan-error path that stalled.
+  This slice re-lands only these paths. (a) Replies that go out through BotService._dispatch
+  (src/bot_service.py:178-185): /start, /help, /reset, /status in both the not-yet-active
+  and active states, and a CV pasted as text. (b) The three _handle_run_command replies
+  (:187-201): setup not finished, scan queued, already queued. (c) The no-new-jobs
+  message from _run_scan (:316-323), once for each of the four _empty_scan_explanation
+  branches (:33-52). tests/test_bot_service.py asserts none of these texts today.'
+acceptance:
+- uv run pytest -q tests/test_bot_service.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_run_quality.py
+- tests/test_notify_ledger.py
+- tests/test_intake.py
+- tests/test_notifier.py
+- tests/test_telegram_api.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 3ea4942
+merged_at: 2026-09-23T17:41:53+0200

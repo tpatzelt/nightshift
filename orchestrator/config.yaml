@@ -1,0 +1,62 @@
+# NIGHTSHIFT tunables. Everything here is read at each loop iteration, so a value
+# can be changed over SSH and picked up without a rebuild.
+
+loop:
+  # Hard stop: hours after arming at which the loop finishes the task in flight,
+  # pauses itself and sends a final digest. 0 disables the deadline.
+  run_until_hours: 48
+  idle_sleep_sec: 60          # sleep when paused / STOP present / nothing to do
+  heartbeat_stale_min: 30     # watchdog + container healthcheck threshold
+  # Counted in parked tasks, not attempts. A task that fails its gates once and
+  # merges on the retry is the loop working as designed; only a task that gives
+  # up after both attempts counts against this.
+  max_consecutive_failures: 3 # parked tasks in a row, then pause and alert
+
+models:
+  # An alias tracks the newest model of that family that the pinned CLI knows about
+  # (NS_CLAUDE_CODE_VERSION in .env), so a newer model needs that pin moved, not this
+  # line. Use a full model name here only to pin one deliberately.
+  worker: sonnet
+  reviewer: opus
+  planner: opus
+  auditor: opus
+
+agent:
+  # Host has 2 CPUs / 31 GB RAM, so one agent at a time with room to spare.
+  cpus: "1.5"
+  memory: 6g
+  pids_limit: 512
+  tmp_size: 2g
+  home_size: 1g
+  default_timeout_min: 45
+  default_max_turns: 60
+
+disk:
+  # Guard on absolute free space on the filesystem holding /data. A percentage
+  # rule is the wrong shape here: / is a 197 GB volume shared with Tim's whole
+  # homelab, so "15% left" is 30 GB of headroom on one day and none on another.
+  alert_free_gb: 10.0
+  pause_free_gb: 5.0
+
+housekeeping:
+  log_cap_gb: 20.0
+  worktree_max_age_days: 3
+  backup_keep_days: 7
+  run_at_hour: 4
+
+planner:
+  merges_between_runs: 8
+  daily_at_hour: 6
+  # Floor between planner runs that an empty backlog alone triggered. Without it,
+  # a charter whose goals are all met turns into an Opus call every ~20 seconds.
+  idle_retry_min: 30
+
+auditor:
+  daily_at_hour: 7
+  pause_at_drift: 6
+
+governor:
+  other_error_backoff_min: [5, 10, 20]
+  limit_backoff_min: [15, 30, 60, 120]
+  max_other_errors: 6
+  weekly_cap_notify_hours: 24

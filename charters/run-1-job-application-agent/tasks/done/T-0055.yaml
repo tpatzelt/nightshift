@@ -1,0 +1,78 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Test-only. Do not change src/intake.py. If a reply turns out to be wrong, report
+  it in a followup instead of fixing it here.
+- Add tests to tests/test_intake.py. Reuse the existing helpers (_manager, _msg, _doc,
+  FakeDownloader, ScriptedExtractor, COMPLETE). For the failed-download path, define
+  a small local downloader whose download_document raises src.telegram_api.TelegramError('download
+  failed'). Assert the whole reply string, e.g. == '⚠️ download failed\n\nPlease try
+  another file.'.
+- For the extraction-error path, assert the reply ends with '\n\nPlease try another
+  file.' and starts with '⚠️ '. You may assert the exact text only after reading what
+  extract_text raises for the chosen payload in src/document_text.py.
+- 'Cover all three states: awaiting CV, awaiting motivation (reach it by sending a
+  valid CV document first) and awaiting job prefs (reach it with /skip after the CV).
+  For each state, assert that the full ''Please upload a document (PDF, DOCX, or text
+  file) or paste the content as a message.'' reply comes back for short text, that
+  at least one error reply comes back for a bad or failed document, and that the user''s
+  state is unchanged afterwards.'
+- 'Offline only: make no live Brave, OpenRouter or Telegram calls. Do not reformat
+  or rename existing tests.'
+- 'attempt 1: reviewer said revise: The diff is test-only, stays within tests/test_intake.py,
+  and serves G3/M3. The new exact-string assertions are correct: I checked them against
+  src/intake.py:312-329 and against the ''Could not extract readable text…'' message
+  in src/document_text.py:33-34. The tests would fail if any of these replies changed.
+  One task requirement is not met. The task says: ''For each state, assert that the
+  full "Please upload a document (PDF, DOCX, or text file) or paste the content as
+  a message." reply comes back for short text.'' The diff does this for the motivation
+  and job-prefs states, '
+created: 2026-09-24T04:08:14+0200
+max_diff_lines: 200
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0055
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the exact unreadable-document, failed-download and 'please upload' replies
+  of _document_or_text in every intake state (re-issue of planned T-0054, which never
+  reached the backlog)
+why: 'The previous planner pass (decision 20260924-040729) planned T-0054 for this
+  gap, but T-0054 is not in /plan/backlog, done or parked, so it never reached the
+  backlog. I checked the gap again against the read-only HEAD 8417268 and it is still
+  open. src/intake.py:312-329 `_document_or_text` produces three user-visible replies.
+  (1) `"⚠️ {exc}\n\nPlease try another file."` when extract_text raises DocumentExtractionError.
+  (2) The same text when download_document raises TelegramError. (3) `"Please upload
+  a document (PDF, DOCX, or text file) or paste the content as a message."` for short
+  or empty text. These replies reach the user from the CV state (src/intake.py:155),
+  the motivation state (:166) and the job-prefs state (:176). tests/test_intake.py
+  checks them only loosely: test_bad_document_reports_error_and_keeps_state (:203)
+  asserts only that ''⚠'' is present, test_short_text_in_cv_state_is_rejected (:162)
+  asserts only a lowercase substring, and neither path is tested in the motivation
+  or job-prefs states. No test anywhere contains ''Please try another file''. The
+  G3 definition of done requires a content-asserting test for every user-visible message
+  path. The other paths are already covered: the Why: line, the ledger, the scan-error,
+  notify-failed and missing-profile texts, and the bot_service replies.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+- grep -q 'Please try another file' tests/test_intake.py
+- grep -q 'Please upload a document (PDF, DOCX, or text file) or paste' tests/test_intake.py
+allowed_paths:
+- tests/test_intake.py
+protected_paths:
+- src/**
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: 7e87c91
+merged_at: 2026-09-24T04:17:15+0200

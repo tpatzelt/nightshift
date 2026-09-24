@@ -1,0 +1,63 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Tests only. Do not edit src/ to fit the tests. If the source text looks wrong, report
+  it in a followup instead.
+- In test_full_intake_happy_path, replace or augment `assert "all set" in reply` with
+  an == assertion on the full finalize reply. Copy the exact string from the current
+  src output, including the emoji prefixes and the blank lines.
+- In test_extraction_failure_falls_back_to_answers, assert the full fallback finalize
+  reply with ==. This is the path where the LLM extraction raises and there are no
+  industries, so the '\U0001f3ed Industries' line must be absent. Compute the expected
+  string from the current src output; do not guess it.
+- Add one test that constructs IntakeManager(store, FakeDownloader(), extractor, scan_hour=9,
+  scan_timezone='Europe/Berlin') directly and asserts that the finalize reply contains
+  'every morning around 09:00 (Europe/Berlin)'. This proves _format_schedule uses
+  the configured hour and timezone, not the defaults.
+- Keep the existing test names and structure; do not reformat other tests or weaken
+  existing assertions.
+- 'Offline only: IntakeManager needs no network. Make no live Telegram, Brave or OpenRouter
+  call, and do not add TELEGRAM_BOT_TOKEN.'
+- "attempt 1: gate failures:\n  - worker reported status=None, not 'done'"
+created: 2026-09-24T08:07:25+0200
+max_diff_lines: 120
+timeout_min: 20
+max_turns: 25
+status: done
+id: T-0061
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the exact text of the setup-complete 'You're all set!' reply, including
+  the parameter summary and the scan schedule
+why: 'G3''s definition of done needs a test asserting the content of every user-visible
+  message path. IntakeManager._finalize (src/intake.py, the ''\U0001f389 You''re all
+  set!'' return) is the reply that finishes onboarding. It is the last intake path
+  whose content is still unasserted. tests/test_intake.py checks only `"all set" in
+  reply` (test_full_intake_happy_path, test_extraction_failure_falls_back_to_answers).
+  No test contains ''every morning around'', ''You''re all set!'' or ''Use /run to
+  start''. So a regression in _format_schedule, a lost Roles/Locations/Language line
+  or dropped /run, /status and /reset hints would pass unnoticed. I verified today''s
+  output in a scratch copy of the tree. With the COMPLETE extraction and the default
+  scan_hour=7 and scan_timezone=''UTC'' it is: "\U0001f389 You''re all set!\n\n\U0001f3af
+  Roles: Project Manager\n\U0001f4cd Locations: Berlin, Germany\n\U0001f511 Keywords:
+  digital transformation\n\U0001f3ed Industries: public sector\n\U0001f310 Language:
+  English\n\nI''ll scan for matching jobs every morning around 07:00 (UTC) and message
+  you when I find new ones. Use /run to start a scan right now, /status to check your
+  setup, or /reset to change your documents." G1 and G2 are met: the offline harness
+  scores 1.000 on every metric against the arming baseline, and pytest gives 382 passed,
+  1 skipped. This is tests-only work strictly within G3.'
+acceptance:
+- uv run pytest -q
+- grep -qF "every morning around 07:00 (UTC) and message you when I find new ones.
+  Use /run to start a scan right now, /status to check your setup, or /reset to change
+  your documents." tests/test_intake.py
+- grep -qF "every morning around 09:00 (Europe/Berlin)" tests/test_intake.py
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_intake.py
+protected_paths:
+- src/**
+merged_sha: 638ad58
+merged_at: 2026-09-24T08:13:57+0200

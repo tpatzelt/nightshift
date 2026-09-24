@@ -1,0 +1,55 @@
+depends_on:
+- T-0004
+new_tests_required: true
+attempts: 0
+notes:
+- Extend STALE_PHRASES with wordings the current list misses, English and German,
+  e.g. 'we are no longer accepting applications for this', 'this position has been
+  closed', 'this role is no longer open', 'the job you selected is no longer available',
+  'diese stelle ist nicht mehr ausgeschrieben', 'diese position ist nicht mehr verfügbar',
+  'die stellenanzeige wurde entfernt', 'diese anzeige ist nicht mehr aktiv'. Every
+  phrase must be specific enough that a live posting cannot contain it - a bare '404'
+  or 'expired' would fire on live pages that mention an expiring benefit or a 404
+  link in a footer, and the resulting false positives will show up as a location_match_rate
+  or posting_shape_rate regression under --check-baseline. Keep matching on the whitespace-normalised
+  lowercase text via the existing _normalize. Add one assertion per added phrase plus
+  a negative test that a normal live posting mentioning 'application deadline' is
+  not marked stale. Do not change LOCATION_ALIASES, COUNTRY_CODES or mentions_location
+  in this task.
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0009
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Catch more closed/filled postings in staleness detection
+why: STALE_PHRASES in src/page_signals.py:10 misses common closure wordings, so dead
+  postings pass the gate in Orchestrator._process_url and get scored and reported
+  as live jobs. Staleness detection is one of the five G1 metrics and must not regress
+  while the others improve.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_page_signals.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/page_signals.py
+- tests/test_page_signals.py
+protected_paths:
+- evals/**
+- src/url_heuristics.py
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/notifier.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 5
+merged_sha: bebe2d8
+merged_at: 2026-09-23T08:05:51+0200

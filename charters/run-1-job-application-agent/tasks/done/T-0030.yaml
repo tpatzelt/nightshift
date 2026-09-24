@@ -1,0 +1,69 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'In canonical_url: normalise the scheme to https for http URLs, strip a leading
+  www. from the host, and sort the surviving query pairs before urlencode so parameter
+  order stops mattering. Keep a non-default port, keep the existing tracking-param
+  and /apply handling, and keep returning the input unchanged for a URL with no scheme.'
+- 'Do not touch callers: Orchestrator._load_cache (src/orchestrator.py:667), _new_urls
+  (:247), _triage_urls (:338) and _process_url (:394) already route through canonical_url,
+  which is why src/orchestrator.py is protected here. tests/test_run_quality.py::test_same_posting_behind_tracking_params_is_fetched_once
+  must stay green unedited.'
+- 'Say this in the task output: an existing on-disk cache.json written with old keys
+  will not match new keys, so the first run after this change may re-check some already-seen
+  postings once. That is acceptable and self-healing, but it must be stated - and
+  note that T-0024''s notified-ledger has the same one-time effect on its own keys
+  whenever this lands.'
+- The acceptance run must show dedup_rate strictly above the committed baseline with
+  no metric below it; quote the delta table. This task is deliberately dependency-free
+  so G2 can progress even if the G1 corpus chain stalls; if T-0028 or T-0029 has already
+  landed, rebase on the tree as it is and keep their tests green rather than reverting
+  anything.
+created: 2026-09-23T12:08:03+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0030
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Canonicalise host, scheme and query order so duplicates collapse (supersedes
+  parked T-0023)
+why: 'canonical_url (src/url_heuristics.py:74) drops the fragment, tracking params
+  and an /apply suffix and lowercases the host, but keeps the scheme, the www. prefix
+  and the original query order, so http://www.x.com/jobs/1 and https://x.com/jobs/1?a=1&b=2
+  vs ?b=2&a=1 are three cache keys for one posting - the same job is fetched, scored
+  and notified more than once. Headroom is verified, not assumed: replaying evals/fixtures
+  today, three of the four labelled duplicate pairs collapse and the failing one is
+  exactly https://www.jobs.lever.co/brightloop/<uuid> against http://jobs.lever.co/brightloop/<uuid>,
+  which is why dedup_rate sits at 0.750 - unchanged under T-0026''s posting-only semantics,
+  which is why this task needs no dependency. Re-issues parked T-0023, which had been
+  gated behind a parked task since its creation.'
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_dedup_canonical.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_dedup_canonical.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- src/bot_service.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 4
+merged_sha: 337dc4d
+merged_at: 2026-09-23T13:01:51+0200

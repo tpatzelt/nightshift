@@ -1,0 +1,12 @@
+# Goals G1 and G2 are verified done. Only one uncovered G3 message path is left to schedule.
+
+_Recorded 20260923-234915 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-23 I checked a read-only copy of the repo at HEAD cac026c. `uv run python -m evals.offline_eval` exits 0 and writes evals/runs/offline/report.json. TOTAL over 58 records is 1.000 on all five metrics. The arming baseline in evals/baseline.json was posting_shape 0.815, aggregator_drop 0.765, location 1.000, staleness 0.429 and dedup 0.571. So posting-shape and aggregator-drop improved and nothing regressed. The README documents each metric. `uv run pytest -q` gives 362 passed, 1 skipped, which is more than the 182/1 arming baseline and not a regression. `uv run python run_mock_test.py` passes. For G3: the delivered-postings ledger (T-0024) and same-list dedup (T-0035) are merged, scan-error and delivery-failure texts are asserted (T-0032, T-0049), and a Why: line is always present (T-0046). I scanned every user-facing string literal in src/bot_service.py, src/notifier.py, src/telegram_api.py and src/intake.py for a test that asserts it. The only unasserted path found is the document-upload failure reply in IntakeManager._document_or_text: the TelegramError branch is untested, and the DocumentExtractionError branch only checks for '⚠'. The worker followup list is empty.
+
+## Decision
+Add one small tests-only task, T-0051 under G3/M3, to close that gap. Do not revive any parked task: every parked item is superseded by merged work (T-0007 by T-0028/T-0029, T-0019/T-0011 chain by T-0026/T-0027, T-0031 by T-0032..T-0034, T-0038/T-0040 by T-0039/T-0042, T-0048 by T-0049). Assumption, taking the conservative reading: the charter's 'every user-visible message path has a test asserting its content' includes intake error replies built from exception text, so this path counts. Log-only strings are not user-visible and get no task. I have no op to change milestone statuses, so I did not touch the roadmap text. It still says 'planned' although M1 and M2 exit criteria are met.
+
+## Consequences
+Once T-0051 merges, all three charter goals meet their definition of done. After that, future passes should schedule only the charter's allowed idle work: tests, documentation and small refactors within G1-G3. No new features and no new corpus or metric work unless a regression appears. No live API calls are needed for T-0051.

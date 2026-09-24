@@ -1,0 +1,53 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Name the failing exception class and a one-line cause (str(exc), whitespace-collapsed,
+  truncated to about 300 characters), keep the existing retry sentence, and say what
+  the user can do next. Scrub anything secret-shaped before sending: never interpolate
+  the bot token, the Brave or OpenRouter key, and strip query strings plus any ''bot<digits>:<secret>''
+  path segment from URLs, because a requests exception message routinely carries the
+  request URL. No live Telegram call anywhere - TELEGRAM_BOT_TOKEN is absent by design;
+  monkeypatch the send boundary the way tests/test_notifier.py already does. Tests:
+  the sent text names the exception type and the cause; a RequestException whose message
+  embeds a URL with a key or token leaks neither; a very long cause still produces
+  a message inside the Telegram limit. Keep the scheduler and queue behaviour untouched.'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0016
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: A failed scan says what failed
+why: _scan_worker (src/bot_service.py:227) catches every exception and sends one fixed
+  line, '⚠️ The job scan hit an error. I'll try again at the next scheduled run.',
+  naming neither the step nor the cause, so the user cannot tell a missing CV from
+  a Brave outage. G3's definition of done requires that an error during a scan produces
+  a message naming what failed.
+acceptance:
+- uv run pytest -q tests/test_bot_service.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/bot_service.py
+- tests/test_bot_service.py
+protected_paths:
+- evals/**
+- src/notifier.py
+- src/telegram_api.py
+- src/orchestrator.py
+- src/url_heuristics.py
+- src/page_signals.py
+- src/crawler_engine.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 6
+merged_sha: 0400ade
+merged_at: 2026-09-23T08:11:42+0200

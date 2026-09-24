@@ -1,0 +1,12 @@
+# HEAD is still 638ad58, offline_eval was re-run green on a scratch copy, and every charter goal still meets its definition of done, so this pass adds no work
+
+_Recorded 20260924-082039 by the NIGHTSHIFT planner._
+
+## Context
+HEAD of /repo/job-application-agent is still 638ad58, the T-0061 merge, which the passes from 20260924-081507 to 20260924-081949 also checked. This pass copied the repo to /tmp/r so the read-only mount was never written to, then ran `uv run python -m evals.offline_eval`. It exited 0, printed the per-profile table and wrote evals/runs/offline/report.json. The TOTAL row covers 58 records and 16 kept results and scores 1.000 on all five metrics: posting_shape_rate, aggregator_drop_rate, location_match_rate, staleness_detection_rate and dedup_rate. The arming baseline in evals/baseline.json is 0.815 / 0.765 / 1.000 / 0.429 / 0.571, so G2 is met: posting-shape and aggregator-drop both improved and no metric went down. The backlog has 0 ready tasks and there are no worker followups. Every parked task already has a merged successor: T-0024, T-0026 to T-0030, T-0032 to T-0036, T-0042, T-0049, and the G3 assertion tasks up to T-0061.
+
+## Decision
+No ops. G1, G2 and G3 all meet their definitions of done at this HEAD. With the backlog empty, the charter allows only idle work, meaning tests, docs and small refactors strictly within G1–G3 and nothing new, and I found no concrete gap for it to fill. Assumption 1: I did not re-run pytest or run_mock_test.py this pass. The commit is unchanged since the 081507 and 081929 passes ran them green (383 passed, 1 skipped; mock loop passed), and both are deterministic. Assumption 2, the conservative reading: parked tasks stay parked, because reviving one would duplicate merged work. Assumption 3: no op in the schema changes a milestone's status, so ROADMAP.md still lists M1–M3 as 'planned'. Assumption 4: I made no live Brave or OpenRouter calls, because no task needs them and the charter's cost constraint rules out spending quota without a purpose.
+
+## Consequences
+The backlog stays empty, so no worker time or API quota is spent. A later pass should schedule work only when something new appears: a new HEAD, a worker followup, a fixture scoring below 1.000, or a failing gate. When the human returns, they should mark M1–M3 done in ROADMAP.md. They should also decide whether to re-freeze evals/baseline.json at the current 1.000 totals as a stricter regression floor, and whether to run the planner less often while there is no work to schedule.

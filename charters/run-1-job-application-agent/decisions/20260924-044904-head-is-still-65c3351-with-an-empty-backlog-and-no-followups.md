@@ -1,0 +1,12 @@
+# HEAD is still 65c3351 with an empty backlog and no followups, so no tasks are added
+
+_Recorded 20260924-044904 by the NIGHTSHIFT planner._
+
+## Context
+On 2026-09-24 I checked /repo/job-application-agent again. HEAD is 65c3351, the T-0060 merge, which is the same commit the previous five planning passes saw. The backlog is empty and no worker followups arrived. I ran `python3 -m evals.offline_eval` on the read-only mount. It printed the per-metric table, and all five TOTAL metrics are 1.000 across 58 records with 16 kept. The frozen arming baseline in evals/baseline.json is posting_shape 0.815, aggregator_drop 0.765, location_match 1.0, staleness 0.429 and dedup 0.571. So G2's definition of done holds: posting-shape and aggregator-drop both improved and no metric went down. G1's harness exists and has tests (test_offline_eval.py, test_offline_metrics.py, test_offline_baseline.py). After printing the table, the command stopped with an error when it tried to write its JSON report, because the mount is read-only (EROFS on evals/runs/offline). That is a limit of this sandbox, not a code defect. G3's items are merged and documented: the Why: line, the notified ledger, and the delivery, scan, search and missing-profile failure text, each asserted at the send boundary (T-0046, T-0049, T-0052, T-0056, T-0057, T-0060). Every parked task was superseded by a re-issue that has since merged.
+
+## Decision
+Add no tasks, revive no parked task and leave the roadmap unchanged. Each assumption below is the most conservative reading the charter allows. (1) The EROFS error while writing the report comes from the read-only planner mount and says nothing about the merge gate, which runs in a writable worktree. (2) HEAD has not moved, so the pytest result recorded at 65c3351 still holds; I did not re-run `uv run pytest -q` here because it cannot create a .venv on this mount. (3) With every goal done, idle work is scheduled only for a gap found in the code, not to keep runners busy, and I found no new gap. (4) I made no live Brave or OpenRouter call, because no open question needed one and live calls cost money.
+
+## Consequences
+The backlog stays empty and runners stay idle, which uses no live-API quota. A later pass should add work only if HEAD moves, a worker files a followup, a gate regresses, or a concrete gap against the definition of done turns up. A regression comes before any idle work, and any idle task must be a test, documentation or a small refactor strictly within G1–G3.

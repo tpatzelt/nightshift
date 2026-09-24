@@ -1,0 +1,47 @@
+depends_on:
+- T-0015
+new_tests_required: true
+attempts: 0
+notes:
+- 'Enumerate every string src/bot_service.py and src/telegram_api.py can put in front
+  of a user - /start and intake replies, the no-new-jobs message and _empty_scan_explanation''s
+  branches, status output, the scan-error text from T-0016 - and assert each one''s
+  content at the send boundary with requests.post monkeypatched. Also assert TelegramClient._split_message
+  keeps every chunk inside the API limit and loses no characters. Tests only: src/**
+  is protected here, so if a path cannot be asserted without a source change, leave
+  it and report it as a followup naming the path. No live Telegram call and no network
+  of any kind; the suite must stay deterministic.'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0017
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the content of every remaining user-visible message path
+why: G3's definition of done requires a test per user-visible message path, but tests/test_bot_service.py
+  covers only scan scheduling times and asserts no message text at all, and the empty-scan
+  explanation (src/bot_service.py:32) and telegram_api's long-message split are never
+  checked for content.
+acceptance:
+- uv run pytest -q tests/test_bot_service.py tests/test_telegram_api.py tests/test_notifier.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+- tests/test_telegram_api.py
+- tests/test_notifier.py
+protected_paths:
+- src/**
+- evals/**
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 9
+park_reason: 'Unreachable and superseded. depends_on: [T-0015], now parked. Re-issued
+  as T-0025, chained behind T-0024 only for the tests/test_notifier.py file overlap.'

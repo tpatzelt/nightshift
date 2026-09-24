@@ -1,0 +1,67 @@
+depends_on:
+- T-0001
+new_tests_required: true
+attempts: 1
+notes:
+- 'First, in evals/checks.py extract the pure part of check_result into score_page(url,
+  final_url, status, text, locations, industries) -> dict, and make check_result do
+  the requests.get and delegate to it. Same returned keys, same values - evals/run_eval.py
+  and evals/recheck.py must keep working unchanged, which is what the full pytest
+  run proves. Do not add a second copy of the scoring rules. Then add evals/metrics.py
+  with one pure function per metric, each taking (kept_records, all_records) and returning
+  a float or None when the denominator is zero. Definitions, which the tests must
+  pin exactly: posting_shape_rate = kept records labelled kind==posting / all kept
+  records (precision, so it cannot be gamed by classifying everything as a posting);
+  aggregator_drop_rate = labelled-aggregator index records that triage dropped / all
+  labelled-aggregator index records; location_match_rate = kept records whose text
+  satisfies src.page_signals.mentions_location for the profile locations / all kept
+  records; staleness_detection_rate = labelled-stale records dropped for staleness
+  / all labelled-stale records; dedup_rate = labelled duplicate records that collapse
+  onto their duplicate_of target under src.url_heuristics.canonical_url / all labelled
+  duplicate records. Each test must assert a wrong implementation fails: e.g. feed
+  a hand-built list where the correct answer is 0.5 and assert 0.5, and assert None
+  (not 0.0, not a ZeroDivisionError) for the empty case.'
+- 'attempt 1: reviewer said revise: The refactor itself is clean and correct: score_page
+  is genuinely pure, check_result keeps identical keys/values (error re-attached after
+  delegation; only dict key order moves, which no caller depends on), run_eval.py/recheck.py
+  are untouched and the full suite passes. No second copy of the scoring rules, no
+  new deps, no secrets, no protected paths touched, 344/350 diff lines. Metric definitions
+  match the task, and the two documented deviations (location_match_rate''s extra
+  `locations` arg; aggregator_drop_rate''s denominator = aggregator AND kind==''index'')
+  are the conserva'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0002
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Split page scoring from fetching and add the five G1 metrics
+why: evals/checks.py:check_result does an HTTP GET before it scores, so none of its
+  logic is reachable offline. G1 needs the five named per-metric scores computed from
+  already-recorded pages, with tests that fail when a metric is miscomputed.
+acceptance:
+- uv run pytest -q tests/test_offline_metrics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/metrics.py
+- evals/checks.py
+- tests/test_offline_metrics.py
+protected_paths:
+- src/**
+- evals/fixtures/**
+- evals/corpus.py
+- evals/run_eval.py
+- evals/recheck.py
+- evals/profiles.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 776f79f
+merged_at: 2026-09-22T17:49:15+0200

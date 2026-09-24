@@ -1,0 +1,11 @@
+{
+  "drift_score": 0,
+  "findings": [
+    "Zero merges, zero agent runs and $0.00 spend in the last 24 hours \u2014 there is no code to judge, so no drift is possible and none is scored.",
+    "The backlog contains only EXAMPLE.yaml.txt, a schema reference whose .txt suffix deliberately excludes it from the queue. No real task exists for M1, M2 or M3, so the system has nothing to pick up and will keep idling at zero throughput.",
+    "/work/done/ and /work/parked/ are both empty and /work/decisions/ has no entries, which is consistent with a system that was armed but never executed a first cycle \u2014 not with work that was attempted and failed.",
+    "No checkout of job-application-agent is present under /work (no .git anywhere), so the charter's test commands (uv run pytest -q, uv run python run_mock_test.py) and the arming baseline of 182 passed / 1 skipped could not be verified from here. Recorded as an assumption, not a claim of breakage.",
+    "Zero sandbox denials: nothing was blocked. The stall is an empty queue, not a restriction."
+  ],
+  "digest": "Nothing happened in the last 24 hours. No agent runs, no merges, no spend, no denials. There is no diff to review, so drift is zero by default rather than by good behaviour.\n\nThe cause looks structural: the backlog holds only the example task template, which is named with a .txt suffix precisely so it is ignored. Nothing is queued for the offline eval harness (M1), the triage improvements (M2) or the message work (M3). done, parked and decisions are all empty, which fits a system that was armed and then never ran a first cycle.\n\nI also could not find a checkout of job-application-agent in this sandbox, so I could not run the test suite or confirm the 182-passed baseline. I am flagging that as unverified rather than broken.\n\nBottom line: the project has not moved toward the charter's definition of done, but it has not drifted away either. It needs at least one real M1 task written into the backlog before any progress can occur. Score kept at 0 so the system is not paused for an empty queue."
+}

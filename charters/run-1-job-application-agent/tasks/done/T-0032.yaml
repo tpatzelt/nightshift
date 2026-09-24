@@ -1,0 +1,77 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Change tests only. src/** is protected. If a path cannot be asserted without changing
+  source, report a followup and do not edit src.
+- '''At the send boundary'' means: monkeypatch requests.post in the src.telegram_api
+  module with a fake whose .json() returns {''ok'': True, ''result'': {}}, record
+  every json= payload, and assert on payload[''text'']. Do not replace svc._telegram.send_message
+  or svc._safe_send.'
+- 'Test 1, the scan error: raise from svc._run_scan an exception that carries a secret-bearing
+  URL and also a non-secret cause that survives scrubbing, e.g. RuntimeError(''POST
+  https://api.telegram.org/bot123456:SECRETTOKEN/sendMessage?key=BRAVE_SECRET failed
+  with 502 Bad Gateway''). Drive _scan_worker once with the existing _stop.is_set
+  counter pattern (tests/test_bot_service.py:129-135). Assert exactly one sendMessage
+  payload, with chat_id ''42''. Its text must contain ''RuntimeError'', ''failed with
+  502 Bad Gateway'', ''/bot***'' and ''/send /run to retry'' wording as sent. It must
+  not contain ''123456:SECRETTOKEN'', ''SECRETTOKEN'' or ''BRAVE_SECRET''. This is
+  the cause assertion the T-0031 attempt-1 reviewer asked for: assert the cause text
+  itself, not only the type name.'
+- 'Test 2, the dispatch failure: build the service with _service(tmp_path, dashboard_enabled=False)
+  so that no port is bound. Replace svc._scan_worker and svc._scheduler with no-op
+  lambdas on the instance so their threads exit at once. Stub svc._dispatch to raise.
+  The fake requests.post routes on the URL suffix: getMe returns {''ok'':True,''result'':{''username'':''x''}},
+  getUpdates returns one update {''update_id'':1,''message'':{''chat'':{''id'':7},''text'':''hi'',''from'':{''first_name'':''A''}}},
+  and sendMessage records the payload. Stub _stop.is_set so the while loop runs exactly
+  one pass. Assert one sendMessage with chat_id 7 or ''7'' (as sent) and text exactly
+  ''⚠️ Something went wrong handling that message. Please try again.''. The test must
+  not sleep for real: monkeypatch src.bot_service.time.sleep to fail the test if called.'
+- Keep the existing test at tests/test_bot_service.py:114. You may strengthen it but
+  must not weaken or delete it.
+- No network and no live Telegram call. Do not depend on TELEGRAM_BOT_TOKEN, which
+  is deliberately absent.
+created: 2026-09-23T17:31:47+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0032
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: Assert the scan-error and dispatch-failure texts at the Telegram send boundary
+  (first slice of parked T-0031)
+why: 'G3''s definition of done needs ''an error during a scan produces a message naming
+  what failed'', and every user-visible message path needs a test that asserts its
+  content. T-0031 tried to cover six message paths in one task. The reviewer sent
+  attempt 1 back over item (d), and attempt 2 ended with no status, most likely because
+  it ran out of turns or time. This slice is the two paths nothing asserts today.
+  First, the scan-error text sent by BotService._scan_worker (src/bot_service.py:249-260).
+  tests/test_bot_service.py:114 checks it only after replacing svc._telegram.send_message,
+  so _scrub_secrets (:65) is never checked in the payload Telegram would actually
+  receive. Second, the reply in BotService.run (:171-176) when a message fails to
+  dispatch: ''⚠️ Something went wrong handling that message. Please try again.'' No
+  test covers it at all.'
+acceptance:
+- uv run pytest -q tests/test_bot_service.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- tests/test_bot_service.py
+protected_paths:
+- src/**
+- evals/**
+- tests/test_run_quality.py
+- tests/test_notify_ledger.py
+- tests/test_intake.py
+- tests/test_notifier.py
+- tests/test_telegram_api.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 8f56459
+merged_at: 2026-09-23T17:36:18+0200

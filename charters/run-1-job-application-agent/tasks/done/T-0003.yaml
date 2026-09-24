@@ -1,0 +1,66 @@
+depends_on:
+- T-0002
+new_tests_required: true
+attempts: 1
+notes:
+- 'evals/offline_eval.py replays each corpus record through the real deterministic
+  functions - src.url_heuristics.canonical_url / classify_url / is_aggregator_url
+  and src.page_signals.find_stale_marker / mentions_location / redirected_off_posting
+  - reproducing the same accept/drop ordering that Orchestrator._triage_urls and Orchestrator._process_url
+  apply (employer postings, then listings, then aggregator postings and index pages;
+  drop non-job URLs, stale pages and pages with no preferred location). Import those
+  functions from src/; do not reimplement or copy the rules, or the harness stops
+  measuring the code G2 will change. Absolutely no network: no requests import, no
+  HTTP. main() must accept --corpus (default evals/fixtures) and --out (default evals/runs/offline),
+  print a per-metric table with one row per profile plus a totals row, write report.json
+  under the out directory, and exit 0. Tests: assert the report file is created with
+  all five metric keys, assert a hand-built two-record corpus produces the expected
+  numbers, and assert the module imports no network client.'
+- 'attempt 1: reviewer said revise: Verified independently: `uv run python -m evals.offline_eval
+  --out /tmp/offl` exits 0, prints the table and writes report.json; tests/test_offline_eval.py
+  passes (6). The replay imports the real src functions rather than reimplementing
+  them, no network import, no new deps, only the two allowed files touched, no scope
+  creep. Three concrete revisions before approval:
+
+
+  1. Test gap on the replay''s own gates (the main issue). The only value-pinning
+  test is the two-record corpus, whose records are label stale=False / duplicate_of=None,
+  so it exercises exactly two of the five de'
+created: 2026-09-22T15:10:55+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0003
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Offline replay driver and `python -m evals.offline_eval`
+why: G1's definition of done is a command that replays the corpus through the agent's
+  deterministic logic, prints a per-metric table and writes a JSON report - the entry
+  point does not exist yet.
+acceptance:
+- uv run python -m evals.offline_eval
+- uv run pytest -q tests/test_offline_eval.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/offline_eval.py
+- tests/test_offline_eval.py
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/checks.py
+- evals/corpus.py
+- evals/fixtures/**
+- evals/run_eval.py
+- evals/recheck.py
+- evals/profiles.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 0f590cc
+merged_at: 2026-09-22T22:18:48+0200

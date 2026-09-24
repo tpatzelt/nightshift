@@ -1,0 +1,95 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'The design below was verified by hand by a planner and twice by a reviewer. It
+  is NOT up for redesign - implement it and spend the effort on the tests. (1) Resolve
+  the revision: use --rev verbatim if given, else the first of `origin/main`, `refs/remotes/origin/main`,
+  `main` that `git rev-parse --verify` accepts (do not depend on one ref layout; the
+  gate clone has carried refs/remotes/origin/* since T-0011''s first attempt). (2)
+  `git archive <rev> src | tar -x -C <tmpdir>`, copy the CURRENT evals/ package into
+  the same tmpdir, run `python -m evals.offline_eval --corpus <abs path to corpus>
+  --out <tmpdir>/out` as a subprocess with cwd=<tmpdir>, and read <tmpdir>/out/report.json.
+  evals/offline_eval.py computes its own ROOT from __file__, so run this way it resolves
+  everything inside the tmpdir and imports the exported src. (3) Print the same table
+  shape offline_eval prints. (4) An optional `--out <file>` writes a baseline JSON
+  in exactly the schema evals/baseline.json already uses (generated_at, corpus_dir,
+  totals{records, kept, metrics}) with the resolved revision additionally recorded
+  in it. The default run must print only and write no baseline; this task must never
+  write evals/baseline.json itself (it is protected here) - T-0012 does that. Standard
+  library only: subprocess, tempfile, shutil, json, pathlib. No network: git reads
+  the local object store. If git, .git, or every candidate revision is unavailable,
+  exit non-zero with a clear message.'
+- 'Six tests are required; both previous attempts were failed on exactly this, so
+  write all six and state in the task output which guarantee each one pins. (a) Replaying
+  evals/fixtures at the resolved arming revision reproduces the committed evals/baseline.json
+  totals exactly: records 23, kept 12, posting_shape_rate 0.750, aggregator_drop_rate
+  1.000, location_match_rate 1.000, staleness_detection_rate 1.000, dedup_rate 0.750.
+  (b) The central guarantee - it replays OLD src, not the working tree - pinned by
+  a non-tautological discriminator I verified myself: the exported src/url_heuristics.py
+  must contain ''devjobs.de'' and must NOT contain ''stellenanzeigen.de'', while the
+  working tree''s file contains both (T-0006 added stellenanzeigen.de and eleven other
+  hosts; kununu.com and devjobs.de were already in AGGREGATOR_HOSTS at arming). Assert
+  both directions in the one test. (c) Isolation: removing the exported src/ from
+  the tmpdir before the subprocess runs makes the replay fail loudly (non-zero exit
+  / ModuleNotFoundError) instead of falling back to the repo''s src. (d) --out writes
+  a file whose JSON schema matches evals/baseline.json key for key and records the
+  resolved revision, and a default run leaves evals/baseline.json byte-identical.
+  (e) Revision resolution tries the candidates in order and takes the first that verifies;
+  an explicit --rev is used verbatim. (f) Every test pytest.skip()s rather than fails
+  when git or the revision is unavailable, so a source export without history still
+  gives a green suite.'
+- No new runtime or test dependency. No network anywhere. Never write a key into a
+  file, a log or a fixture. Do not touch src/** or the corpus. `uv run pytest -q`
+  must stay green (182 passed, 1 skipped plus the new tests). Document the tool in
+  README beside the existing offline-metrics section, saying in one line why the baseline
+  is computed from arming src rather than the current tree.
+created: 2026-09-23T07:50:09+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0018
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Re-derive the arming baseline by replaying the corpus against the arming revision
+  (supersedes parked T-0011)
+why: 'G2''s definition of done demands improvement on aggregator-drop rate, but evals/baseline.json
+  records it at 1.000 over today''s 23 records, so the improvement is arithmetically
+  impossible until the corpus grows - and growing the corpus silently invalidates
+  a baseline frozen against the old corpus. The only honest fix is to recompute the
+  baseline from the ARMING revision''s src on whatever corpus the harness replays,
+  which needs a tool. I verified the gap is real and recoverable: git in /repo resolves
+  origin/main to b6da8dd (the arming commit) and HEAD to 758f6d8, and `git diff --stat
+  b6da8dd..HEAD -- src/` shows exactly one changed file, src/url_heuristics.py (+71/-2,
+  T-0006''s aggregator widening). T-0011 carried this work, was reviewed twice as
+  ''the tool itself is correct'', failed both times on test coverage, and its diff
+  is absent from the tree (there is no evals/rebaseline.py). This re-issues it with
+  the tests enumerated so the same gap cannot recur. T-0011 stays parked and must
+  not be revived.'
+acceptance:
+- uv run python -m evals.rebaseline --corpus evals/fixtures
+- uv run pytest -q tests/test_rebaseline.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/rebaseline.py
+- tests/test_rebaseline.py
+- README.md
+protected_paths:
+- evals/baseline.json
+- evals/fixtures/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/offline_eval.py
+- evals/profiles.py
+- src/**
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+merged_sha: 700bff9
+merged_at: 2026-09-23T08:00:57+0200

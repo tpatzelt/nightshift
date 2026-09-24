@@ -1,0 +1,59 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'In _format_result, when the stripped reason is empty, still emit a ''Why:'' line
+  with an honest fallback that uses only what JobResult holds, e.g. ''Why: scored
+  {score}; the evaluator gave no explanation''. Do not invent a reason, and do not
+  change the non-empty path or MAX_REASON_CHARS truncation.'
+- 'Replace the assertion in test_notify_empty_reason_produces_no_blank_line: a blank
+  or whitespace-only reason must now produce a ''Why:'' line that contains the score,
+  still with no blank lines. Keep the test name or rename it minimally. Add a case
+  for a whitespace-only reason. The test must fail against the current src/notifier.py.'
+- Change no LLM prompt and nothing in src/llm_service.py (charter non-goal). Do not
+  reformat or reorder the existing tests.
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. TELEGRAM_BOT_TOKEN is
+  absent by design.'
+created: 2026-09-23T23:14:39+0200
+max_diff_lines: 120
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0046
+project: job-application-agent
+charter_goal: G3
+roadmap_ref: M3
+title: Every job message says why it matched, even when the evaluator's reason is
+  blank
+why: 'G3 requires job messages that state why a job matched. TelegramNotifier._format_result
+  (src/notifier.py:112-120) adds a ''Why:'' line only when result.reason is non-empty
+  after strip(). JobResult.reason comes from evaluation.reason (src/orchestrator.py:507).
+  src/llm_service.py only checks that the ''reason'' key is present, so an evaluator
+  reply of "reason": "" or whitespace passes through. The job is then sent with a
+  score and a URL but no explanation. tests/test_notifier.py:121 (test_notify_empty_reason_produces_no_blank_line)
+  currently asserts that behaviour (''Why:'' not in entry). I confirmed on 2026-09-23
+  that the other G3 items are covered: repeat notifications (T-0024, T-0035), scan-error
+  text (T-0032) and send-boundary content (T-0033, T-0034, T-0045). This gap is the
+  last one I could find in G3''s ''state why a job matched''.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+allowed_paths:
+- src/notifier.py
+- tests/test_notifier.py
+protected_paths:
+- src/orchestrator.py
+- src/llm_service.py
+- src/bot_service.py
+- src/telegram_api.py
+- src/url_heuristics.py
+- src/page_signals.py
+- evals/**
+- README.md
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+merged_sha: fc06634
+merged_at: 2026-09-23T23:17:44+0200

@@ -1,0 +1,57 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- Edit only the paragraph at README.md:112-118 in the 'Telegram notifications' section.
+  Add at most one or two sentences. They must say that if a bot scan is due but the
+  user's CV and/or job preferences are missing, the user gets a message starting 'Scan
+  did not run' that names what is missing (your CV / your job preferences) and tells
+  them to send /start (or /reset) to finish setup. They must also say the scan attempt
+  is timestamped, so the user is not re-prompted every scheduler tick. Read src/bot_service.py:57-70
+  and 294-307 first, so every sentence matches the code.
+- Do not reword, reflow or restructure anything else in the README (charter non-goal).
+- 'Offline only: no live Brave, OpenRouter or Telegram calls. Touch no code, tests,
+  fixtures or baseline.json.'
+created: 2026-09-24T03:54:19+0200
+max_diff_lines: 20
+timeout_min: 15
+max_turns: 20
+status: done
+id: T-0053
+project: job-application-agent
+roadmap_ref: M3
+charter_goal: G3
+title: 'README: say what an active bot user is told when their CV or preferences are
+  missing and their scan does not run'
+why: 'This is idle work the charter allows: documentation strictly within G3. The
+  planner checked on 2026-09-24 against a read-only copy of HEAD 9fd170c, and all
+  three definitions of done are met. `uv run python -m evals.offline_eval` scores
+  every TOTAL metric at 1.000. The arming baseline in evals/baseline.json was posting_shape
+  0.815, aggregator_drop 0.765, location 1.000, staleness 0.429 and dedup 0.571, so
+  nothing regressed. `uv run pytest -q` gives 369 passed, 1 skipped, and run_mock_test.py
+  passes. T-0052 (merged after T-0050''s README update) added a new user-visible message
+  path: src/bot_service.py:57 _format_missing_profile_message, sent from _run_scan
+  at src/bot_service.py:296-307. The README''s ''Telegram notifications'' section
+  (README.md:103-118) lists the scan-failure and delivery-failure messages but does
+  not mention this one. Operators reading the README cannot learn that an active user
+  who has not finished setup gets a warning naming what is missing, or that the scan
+  attempt is timestamped so the scheduler does not re-queue that user every minute.'
+acceptance:
+- uv run pytest -q
+- uv run python run_mock_test.py
+- uv run python -m evals.offline_eval --out /tmp/oe --check-baseline
+- grep -q 'Scan did not run' README.md
+allowed_paths:
+- README.md
+protected_paths:
+- evals/**
+- src/**
+- tests/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- CLAUDE.md
+merged_sha: '8417268'
+merged_at: 2026-09-24T03:57:21+0200

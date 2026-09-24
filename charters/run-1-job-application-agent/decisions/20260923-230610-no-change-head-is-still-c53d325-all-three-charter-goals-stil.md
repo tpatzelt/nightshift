@@ -1,0 +1,12 @@
+# No change: HEAD is still c53d325, all three charter goals still meet their definition of done, and the backlog stays empty
+
+_Recorded 20260923-230610 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty and there are no worker followups. /repo/job-application-agent is still at c53d325888ad989b75193b9468daa400bc7ca8f8 (T-0043), and `git status` shows a clean working tree. That is the same commit the previous planner passes checked. At this commit, earlier passes recorded TOTAL scores of 1.000 for posting_shape_rate, aggregator_drop_rate, location_match_rate, staleness_detection_rate and dedup_rate. The arming baseline in evals/baseline.json (revision b6da8dd) is 0.815, 0.765, 1.000, 0.429 and 0.571. So G2's required improvements on posting-shape and aggregator-drop are met, and no metric has gone down. G1 (offline_eval, its tests and the README section) and G3 (the durable notification ledger T-0024, within-batch dedup T-0035, and the send-boundary content assertions T-0032, T-0033 and T-0034) are merged. Every parked task has been re-issued and merged, or its work was absorbed by later tasks.
+
+## Decision
+No tasks are added, updated, reordered or parked. Assumptions, recorded because the human cannot be asked: (1) HEAD and the working tree have not changed, so this pass relies on the gate results earlier passes recorded at c53d325 and did not re-run them. Those results are: pytest 347 passed, 1 skipped (the arming baseline was 182 passed, 1 skipped); run_mock_test.py passing; offline_eval exiting 0. (2) The charter allows idle work but does not require it. There is no concrete defect, followup or new evidence, so speculative tasks would only add churn and put the green gates at risk. (3) No live Brave or OpenRouter calls were made, because nothing needs validating and live calls cost money. (4) The charter names evals/runs/** as the source of recorded runs, but the recorded corpus is under evals/fixtures/. I kept treating the fixtures as those runs, as earlier passes did, and did not open a task to move the files. (5) M1–M3 stay 'planned' because none of the available ops can change a milestone's status.
+
+## Consequences
+Workers stay idle and there is no live-API spend. A later pass should plan work only if HEAD moves, a worker followup arrives, a gate regresses, or a new recorded run shows a miss. When the human returns, they may want to mark M1–M3 done in ROADMAP.md by hand, and to confirm that reading evals/fixtures as the charter's evals/runs/** is what they meant.

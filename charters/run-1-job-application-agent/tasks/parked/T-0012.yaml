@@ -1,0 +1,83 @@
+depends_on:
+- T-0011
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add roughly 20-30 records across the existing fixture files, or new *.jsonl files
+  whose stem is already a profile name in evals/profiles.py (project-manager-berlin,
+  data-engineer-amsterdam and food-product-manager-berlin are defined but unused);
+  do not edit evals/profiles.py, or locations_for() will return [] and location_match_rate
+  becomes meaningless. The charter invites live validation: spend a small, budgeted
+  number of real Brave searches to source genuine URL shapes and page text (keep exploratory
+  runs tiny, never loop a search), then hand-label what comes back. Never write a
+  key into a fixture, a log or a commit. Labels are ground truth read off the page
+  - never generated from classify_url/find_stale_marker, or the metrics become tautologies.
+  Cover five categories: (1) postings on ATS vendors _ats_kind does not know (bamboohr.com,
+  teamtailor.com, softgarden.io/.de, jobvite.com, breezy.hr, applytojob.com, icims.com,
+  taleo.net, pinpointhq.com, hire.withgoogle.com) plus each vendor''s board root labelled
+  listing; (2) non-postings with digit-shaped paths, e.g. /careers/2024/ and /jobs/page/2,
+  labelled listing or index; (3) index pages on the hosts T-0006 added (kununu.com,
+  devjobs.de, stellenanzeigen.de, stellenmarkt.de, meinestadt.de, jobware.de, absolventa.de,
+  jobvector.de, talent.com, careerjet., neuvoo., simplyhired., whatjobs.com, jobsora.)
+  labelled aggregator index - these are what will finally give aggregator_drop_rate
+  headroom at arming; (4) near-duplicate pairs differing only by scheme, a www. prefix,
+  or query-parameter order, with duplicate_of set; (5) postings closed with the wordings
+  T-0009 targets, English and German, labelled stale. Give each record realistic page
+  text, including the location as a real page states it. Then re-freeze with `uv run
+  python -m evals.rebaseline --corpus evals/fixtures --out evals/baseline.json`: the
+  baseline must be computed from ARMING src, never from the current tree. Put the
+  arming-vs-current delta table in the task output. If the expanded corpus shows any
+  metric where current is BELOW arming, do not delete or soften the record - that
+  is a real regression T-0006 introduced; keep it, report it as a followup naming
+  the records, and say so in the output.'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 400
+timeout_min: 60
+max_turns: 80
+status: parked
+id: T-0012
+project: job-application-agent
+roadmap_ref: M1
+charter_goal: G1
+title: Extend the labelled corpus with the URL shapes the code actually gets wrong,
+  then re-freeze the arming baseline
+why: On the present 23-record corpus the arming baseline is already 1.000 for aggregator_drop_rate,
+  location_match_rate and staleness_detection_rate, so G2's required improvement in
+  aggregator-drop rate is arithmetically impossible and T-0006's aggregator widening
+  provably moved no metric (the planner replayed this corpus against arming src and
+  got the frozen baseline back, delta +0.000 on all five). The harness can only measure
+  quality changes if the corpus contains the shapes the deterministic logic gets wrong.
+acceptance:
+- uv run python -m evals.offline_eval
+- uv run python -m evals.rebaseline --corpus evals/fixtures --out evals/baseline.json
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- evals/fixtures/**
+- evals/baseline.json
+- tests/test_eval_corpus.py
+- README.md
+protected_paths:
+- src/**
+- evals/metrics.py
+- evals/corpus.py
+- evals/offline_eval.py
+- evals/rebaseline.py
+- evals/profiles.py
+- tests/test_offline_metrics.py
+- tests/test_offline_eval.py
+- tests/test_offline_baseline.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 1
+park_reason: 'Unreachable and superseded. It still carries depends_on: [T-0011], and
+  T-0011 is parked (its work was re-issued and merged as T-0018, sha 700bff9), so
+  no runner can ever pick it up; the two previous passes'' update_task ops to repoint
+  it were not applied to the tree. Re-issued verbatim-plus-corrections as T-0020,
+  which depends on T-0019 instead. Do not revive: T-0020 carries the same corpus work
+  and two workers hand-labelling the same corpus is the outcome to avoid.'

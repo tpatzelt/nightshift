@@ -1,0 +1,31 @@
+# NIGHTSHIFT egress allowlist — one domain per line, comments with #.
+# squid allows CONNECT :443 to these and nothing else. Every other destination,
+# and every RFC1918 / link-local / CGNAT address, is denied even if a name
+# resolves to it.
+
+# Claude Code itself
+api.anthropic.com
+
+# Python packaging
+pypi.org
+files.pythonhosted.org
+
+# Node packaging
+registry.npmjs.org
+
+# Debian packages (only needed if a task installs a system library; harmless otherwise)
+deb.debian.org
+security.debian.org
+
+# Read-only GitHub, needed at *import* time by this project's dependencies:
+#   litellm            -> raw.githubusercontent.com (model price map)
+#   botasaurus_requests-> api.github.com + objects.githubusercontent.com (native lib)
+# No credentials exist in the sandbox and CONNECT is the only method, so this is
+# fetch-only; pushing stays impossible (managed deny rules + guard + no keys).
+raw.githubusercontent.com
+api.github.com
+objects.githubusercontent.com
+codeload.github.com
+github.com
+release-assets.githubusercontent.com
+ftp.mozilla.org

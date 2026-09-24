@@ -1,0 +1,55 @@
+depends_on:
+- T-0013
+new_tests_required: true
+attempts: 0
+notes:
+- 'Treat a bare four-digit segment in 1900-2100 as a year and a bare digit segment
+  directly following a ''page'' or ''seite'' segment as a page number, and stop both
+  from counting as a job ID. Keep UUIDs and 5+ digit runs. The T-0007 reviewer verified
+  that adding a `continue` after the pure-digit branch is safe because _DIGIT_RUN_RE
+  is \d{5,} and cannot match a <=4-character pure-digit segment, so no prior true
+  positive is lost - keep that property and say in the output that you checked it.
+  Tests: /careers/2024/ and /jobs/page/2 classify as LISTING or INDEX, a real 5+ digit
+  posting id still classifies as POSTING, and a four-digit segment outside the year
+  range (e.g. /jobs/4821) keeps its current classification. Acceptance must show posting_shape_rate
+  at or above what T-0013 left it and no metric below baseline.'
+created: 2026-09-22T23:12:33+0200
+max_diff_lines: 150
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0014
+project: job-application-agent
+roadmap_ref: M2
+charter_goal: G2
+title: Stop year and page-number path segments counting as posting IDs
+why: _has_posting_id (src/url_heuristics.py:262) returns True for any pure-digit path
+  segment of three characters or more, so /careers/2024/ and /blog/2019/ classify
+  as POSTING and reach scoring as if they were jobs, dragging posting_shape_rate down
+  - the second half of the parked T-0007 work, and the other direction of the charter's
+  must-improve metric.
+acceptance:
+- uv run python -m evals.offline_eval --check-baseline
+- uv run pytest -q tests/test_url_heuristics.py
+- uv run pytest -q
+- uv run python run_mock_test.py
+allowed_paths:
+- src/url_heuristics.py
+- tests/test_url_heuristics.py
+protected_paths:
+- evals/**
+- src/orchestrator.py
+- src/crawler_engine.py
+- src/page_signals.py
+- src/notifier.py
+- tests/test_run_quality.py
+- Dockerfile
+- docker-compose.yml
+- .github/**
+- pyproject.toml
+- uv.lock
+- CLAUDE.md
+rank: 3
+park_reason: 'Unreachable and superseded. depends_on: [T-0013], now parked. Re-issued
+  as T-0022, chained behind T-0021 for the same src/url_heuristics.py file-overlap
+  reason, and behind T-0019 so its metric can actually move.'
