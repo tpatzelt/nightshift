@@ -1,0 +1,45 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- 'Copy only: do not invent factual claims about the person (employers, projects,
+  publications, numbers). Use playful, non-factual ML metaphors only (e.g. ''status:
+  training · epoch ∞'').'
+- Keep every existing class name (status-card, status-dot, status-text, footer, heart)
+  so the styles from T-0001/T-0004 still apply.
+- Do not add any personal data, emails, or links beyond what already exists.
+created: 2026-09-24T23:26:20+0200
+max_diff_lines: 40
+timeout_min: 20
+max_turns: 30
+status: done
+id: T-0007
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Replace the placeholder status-card and footer copy with short ML-flavoured
+  microcopy
+why: index.html still shows the generic placeholder 'More info coming soon...' and
+  a stock 'Built with ♥ and Jekyll' footer. These are the only parts of the hero that
+  don't carry the ML-engineer art direction. Short, whimsical ML-flavoured microcopy
+  (for example a training-status line) finishes the identity.
+acceptance:
+- test -f index.html
+- '! grep -q ''More info coming soon'' index.html'
+- grep -q 'class="status-text"' index.html
+- grep -q 'class="heart"' index.html
+- grep -q 'class="footer"' index.html
+allowed_paths:
+- index.html
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+- assets/**
+merged_sha: 5c34135
+merged_at: 2026-09-24T23:29:15+0200

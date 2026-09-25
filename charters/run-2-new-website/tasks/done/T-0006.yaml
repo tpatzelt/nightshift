@@ -1,0 +1,56 @@
+depends_on: []
+new_tests_required: false
+attempts: 1
+notes:
+- The repo has no test harness and charter test_cmd is empty, so acceptance is limited
+  to syntax and grep checks; do not add test tooling.
+- Under reduced motion, set the full typing text at once and still call window.catCursor.updatePosition
+  and startFlying so the cat-cursor contract keeps working. Do not register the mousemove
+  parallax listener.
+- Keep the existing IIFE / 'use strict' style and read the media query the same way
+  background.js does (window.matchMedia guard).
+- 'attempt 1: reviewer said revise: The behaviour is correct and in scope. With reduced
+  motion on, the full text is set at once, updatePosition and startFlying are still
+  called through the shared finishTyping(), and the mousemove, mouseleave and blur
+  parallax listeners are not registered. The refactor is small and the IIFE / ''use
+  strict'' style is kept. One explicit task note is not met: it asks main.js to ''read
+  the media query the same way background.js does (window.matchMedia guard)''. background.js
+  checks first (`window.matchMedia ? window.matchMedia(''(prefers-reduced-motion:
+  reduce)'') : null`). main.js li'
+created: 2026-09-24T23:26:20+0200
+max_diff_lines: 120
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0006
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Make the typing effect and pointer parallax in main.js respect prefers-reduced-motion
+why: 'The artsy motion layers (canvas, shapes, status dot, buttons) already honour
+  prefers-reduced-motion in style.css and background.js. assets/js/main.js does not:
+  it still types the tagline one character at a time and still moves the --bg-x/--bg-y/--bg-rot
+  parallax on every mouse move. The design should handle reduced motion the same way
+  everywhere.'
+acceptance:
+- node --check assets/js/main.js
+- grep -q 'prefers-reduced-motion' assets/js/main.js
+- grep -q 'startFlying' assets/js/main.js
+- grep -q 'updatePosition' assets/js/main.js
+allowed_paths:
+- assets/js/main.js
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- _layouts/**
+- assets/css/**
+- assets/js/background.js
+- assets/js/cat-cursor.js
+merged_sha: b1cfb04
+merged_at: 2026-09-24T23:28:45+0200

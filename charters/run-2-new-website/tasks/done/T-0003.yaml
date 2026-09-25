@@ -1,0 +1,47 @@
+depends_on:
+- T-0001
+new_tests_required: false
+attempts: 0
+notes:
+- You may reuse the hidden .floating-shapes markup in index.html (restyle it and make
+  it visible) or use body::before/::after pseudo-elements.
+- 'Use transform: translate(var(--bg-x,0), var(--bg-y,0)) rotate(var(--bg-rot,0))
+  or similar, and always give a fallback value.'
+- 'Under @media (prefers-reduced-motion: reduce), neutralise the transforms.'
+- 'Keep the layer decorative: aria-hidden, pointer-events:none, behind the content.'
+created: 2026-09-24T21:23:02+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0003
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Wire the existing pointer-parallax variables (--bg-x/--bg-y/--bg-rot) into
+  a decorative layer
+why: assets/js/main.js already sets the --bg-x, --bg-y and --bg-rot custom properties
+  on mouse move, but style.css never reads them, so this code does nothing. Using
+  them for a subtle parallax gradient or shape layer adds the interactive, artsy depth
+  that G1 asks for, with no new JS.
+acceptance:
+- grep -q 'var(--bg-x' assets/css/style.css
+- grep -q 'var(--bg-y' assets/css/style.css
+- grep -q 'prefers-reduced-motion' assets/css/style.css
+- python3 -c "s=open('assets/css/style.css').read(); assert s.count('{')==s.count('}')"
+allowed_paths:
+- assets/css/style.css
+- index.html
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+- assets/js/**
+- assets/css/cat-cursor.css
+merged_sha: 4affd8a
+merged_at: 2026-09-24T21:30:44+0200

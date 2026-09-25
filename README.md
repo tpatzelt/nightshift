@@ -89,6 +89,7 @@ and what to fix next. Archiving is automatic; the "what to fix next" half of
 | Run | Charter | Result |
 |---|---|---|
 | 1 | job-application-agent: offline result-quality harness, better triage, output that explains itself | [RESULT.md](charters/run-1-job-application-agent/RESULT.md) — 42 merged, $138.96 |
+| 2 | tpatzelt.github.io: artsy landing page for a machine learning engineer | [RESULT.md](charters/run-2-new-website/RESULT.md) — 8 merged, $5.12, deployed |
 
 Between runs there is nothing to do: press **Finish run**, or let the deadline or an
 idle planner end it, and the next queued charter is armed. `scripts/reset-run.sh` is

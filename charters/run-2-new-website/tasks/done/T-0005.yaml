@@ -1,0 +1,57 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- Edit only _layouts/default.html. Put the favicon inline as a data URI, for example
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,...">, with the SVG
+  URL-encoded (# becomes %23). Do not create new files.
+- Add exactly <meta name="theme-color" content="#0a0b14">. This value is --bg in assets/css/style.css.
+- 'Colour the favicon from the palette in style.css: --bg #0a0b14, --accent-violet
+  #9d7bff, --accent-cyan #4fd8e6, --accent-pink #ff6fb0. Keep it simple enough to
+  read at 16x16, e.g. 3 to 5 circles joined by lines.'
+- Keep every existing <link> and <script> tag, the Google Fonts preconnects and {{
+  content }}. Do not reorder the scripts.
+- No external requests beyond those already present, no secrets and no personal data.
+  Do not touch _config.yml.
+- Run the acceptance commands from the repo root.
+created: 2026-09-24T21:53:58+0200
+max_diff_lines: 80
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0005
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: 'Carry the artsy identity into browser chrome: inline SVG favicon with a neural-net
+  motif, plus a theme-color meta tag'
+why: T-0001 to T-0004 restyled the page, but _layouts/default.html still has no favicon
+  and no theme-color. The browser tab shows a generic icon and the mobile address
+  bar stays default grey or white. That breaks the art-directed look G1 asks for at
+  the first thing a visitor sees. A small SVG mark in the palette (a few nodes and
+  weighted edges in violet, cyan and pink on the ink background) and a theme-color
+  matching --bg finish the design without adding assets or personal data.
+acceptance:
+- grep -q 'rel="icon"' _layouts/default.html
+- grep -q 'image/svg+xml' _layouts/default.html
+- grep -q 'name="theme-color"' _layouts/default.html
+- grep -qi 'content="#0a0b14"' _layouts/default.html
+- grep -q 'background.js' _layouts/default.html
+- grep -q 'cat-cursor.js' _layouts/default.html
+- grep -q 'main.js' _layouts/default.html
+- grep -q '{{ content }}' _layouts/default.html
+allowed_paths:
+- _layouts/default.html
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- assets/js/**
+- assets/css/**
+merged_sha: 3f4afe6
+merged_at: 2026-09-24T21:54:54+0200

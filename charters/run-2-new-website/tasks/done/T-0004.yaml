@@ -1,0 +1,55 @@
+depends_on:
+- T-0001
+new_tests_required: false
+attempts: 0
+notes:
+- 'Keep every existing link: GitHub, LinkedIn, email and the CV download. Keep the
+  #typing-text and .typing-wrapper elements, because main.js and cat-cursor.js depend
+  on them.'
+- Do not add new biographical claims or personal data. Use only what _config.yml already
+  provides via site.author.*. Purely decorative ML motifs (for example '// latent
+  space' labels or tensor-shape annotations) are fine.
+- Remove dead selectors (.greeting, .wave, .hi, .cursor-blink, .btn-shine, .typing-label)
+  only if nothing in index.html references them.
+- Give focus-visible states at least as much emphasis as hover states. Wrap animations
+  in prefers-reduced-motion guards.
+created: 2026-09-24T21:23:02+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0004
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Art-direct the hero typography and interactive states (name, tagline, buttons,
+  footer)
+why: For G1 the hero should feel designed, not default. Right now the name is plain
+  white bold text. The social, CV and status elements share one identical grey 1px
+  border and have no hover, focus or transition states. The .btn-shine and .cursor-blink
+  styles are dead. Expressive type treatment (for example a gradient or outlined name,
+  mono ML-style annotations) and accent-coloured hover and focus states finish the
+  look.
+acceptance:
+- grep -q ':hover' assets/css/style.css
+- grep -q 'transition' assets/css/style.css
+- grep -q 'prefers-reduced-motion' assets/css/style.css
+- python3 -c "s=open('assets/css/style.css').read(); assert s.count('{')==s.count('}')"
+- 'python3 -c "s=open(''index.html'').read(); assert s.startswith(''---'') and ''layout:
+  default'' in s and ''site.author.name'' in s and ''cv.pdf'' in s"'
+allowed_paths:
+- assets/css/style.css
+- index.html
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+- assets/js/**
+- assets/css/cat-cursor.css
+merged_sha: 00a04bc
+merged_at: 2026-09-24T21:34:17+0200

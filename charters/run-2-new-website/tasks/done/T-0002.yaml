@@ -1,0 +1,52 @@
+depends_on:
+- T-0001
+new_tests_required: false
+attempts: 0
+notes:
+- Create the new file assets/js/background.js and load it from _layouts/default.html
+  with a plain <script> tag. Do not use external libraries or CDNs.
+- The canvas must be fixed, sit behind the content (negative z-index), use pointer-events:none
+  and aria-hidden="true", and read its colours from the CSS custom properties added
+  in T-0001 via getComputedStyle.
+- 'Honour prefers-reduced-motion: draw one static frame and do not animate. Also pause
+  the animation when document.hidden, and cap the node count so it stays light on
+  mobile.'
+- Do not break the cat cursor (cat-cursor.js) or the typing effect (main.js).
+created: 2026-09-24T21:23:02+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0002
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Add a generative ML-themed canvas background (neural-net / latent-space motif)
+why: For G1, the page needs a visual signature that says both 'art' and 'machine learning'.
+  The hero is currently plain text on flat black, and the .floating-shapes block in
+  index.html is set to display:none. A lightweight canvas background, such as drifting
+  nodes with weighted edges or a loss-landscape contour field, drawn in the palette's
+  accent colours, gives the page that identity.
+acceptance:
+- test -f assets/js/background.js
+- node --check assets/js/background.js
+- grep -q 'background.js' _layouts/default.html
+- grep -q 'prefers-reduced-motion' assets/js/background.js
+- grep -q 'aria-hidden' assets/js/background.js
+allowed_paths:
+- assets/js/background.js
+- _layouts/default.html
+- assets/css/style.css
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- assets/js/cat-cursor.js
+- assets/js/main.js
+- assets/css/cat-cursor.css
+merged_sha: 37f08e8
+merged_at: 2026-09-24T21:29:21+0200

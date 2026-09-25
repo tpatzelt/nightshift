@@ -1,0 +1,44 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- Only change the final background layer in the body rule from var(--bg-elevated)
+  to var(--bg) and delete the .greeting block inside the 768px media query. Keep the
+  --bg-elevated token defined, because other rules may use it.
+- Keep the two radial-gradient layers in the body background exactly as they are.
+created: 2026-09-24T23:26:20+0200
+max_diff_lines: 40
+timeout_min: 20
+max_turns: 30
+status: done
+id: T-0008
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Use the --bg token as the page base colour and remove the dead .greeting rule
+  in style.css
+why: body uses var(--bg-elevated) (#14172c) as its base colour. The theme-color meta
+  and the favicon use --bg (#0a0b14), so the browser chrome and the page don't match.
+  style.css also still styles a .greeting class that no markup uses. Aligning the
+  base colour with the design token and removing dead CSS keeps the palette consistent.
+acceptance:
+- grep -Eq '^\s*var\(--bg\);' assets/css/style.css
+- '! grep -q ''\.greeting'' assets/css/style.css'
+- grep -q -- '--bg-elevated' assets/css/style.css
+- grep -q 'prefers-reduced-motion' assets/css/style.css
+allowed_paths:
+- assets/css/style.css
+protected_paths:
+- _config.yml
+- assets/cv.pdf
+- assets/walking_cat_sprite.png
+- .github/**
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- _layouts/**
+- assets/js/**
+- assets/css/cat-cursor.css
+merged_sha: e2fcbc0
+merged_at: 2026-09-24T23:29:53+0200
