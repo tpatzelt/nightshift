@@ -11,8 +11,12 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# A repo without a tests/ directory can still have a suite: the Jekyll site's
+# only gate is scripts/check-site.sh, and until it counted here every task with
+# new_tests_required parked no matter how well it was done.
 TEST_PATH_RE = re.compile(r"(^|/)(tests?|spec)/|(^|/)test_[^/]+\.py$|"
-                          r"[^/]+_test\.(py|go|js|ts)$|\.(test|spec)\.(js|ts|tsx)$")
+                          r"[^/]+_test\.(py|go|js|ts)$|\.(test|spec)\.(js|ts|tsx)$|"
+                          r"(^|/)scripts/check-[^/]+\.sh$")
 
 # Ways a diff can make the suite lie about itself.
 WEAKENING_RULES = [

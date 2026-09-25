@@ -147,6 +147,30 @@ expect("source-only change passes when tests are not required",
        gates.run_gates({**TASK, "new_tests_required": False}, r, BASE, DONE, fake_sandbox()),
        True)
 
+# A repo whose whole suite is a shell check script, like the Jekyll site's
+# scripts/check-site.sh, still satisfies gate 6 by extending that script.
+SITE_FILES = {
+    "index.html": "<h1>hi</h1>\n",
+    "scripts/check-site.sh": "#!/bin/bash\nset -e\ngrep -q '<h1' index.html\n",
+}
+SITE_TASK = {**TASK, "allowed_paths": ["index.html", "scripts/**", "_data/**"]}
+r = make_repo(SITE_FILES)
+commit(r, {"index.html": "<h1>hi</h1>\n<section id=\"work\"></section>\n"})
+expect("check script repo: markup-only change fails",
+       gates.run_gates(SITE_TASK, r, BASE, DONE, fake_sandbox()), False, "no test file")
+r = make_repo(SITE_FILES)
+commit(r, {"index.html": "<h1>hi</h1>\n<section id=\"work\"></section>\n",
+           "scripts/check-site.sh": "#!/bin/bash\nset -e\ngrep -q '<h1' index.html\n"
+                                    "grep -q 'id=\"work\"' index.html\n"})
+expect("check script repo: extending check-site.sh satisfies gate 6",
+       gates.run_gates(SITE_TASK, r, BASE, DONE, fake_sandbox()), True)
+r = make_repo(SITE_FILES)
+commit(r, {}, remove=["scripts/check-site.sh"])
+expect("check script repo: deleting check-site.sh fails",
+       gates.run_gates({**SITE_TASK, "new_tests_required": False}, r, BASE, DONE,
+                       fake_sandbox()),
+       False, "was deleted")
+
 print("\n--- gate 7: secrets ---")
 for secret, label in (("sk-ant-oat01-" + "A" * 40, "oauth token"),
                       ("sk-or-v1-" + "c" * 40, "openrouter key"),
