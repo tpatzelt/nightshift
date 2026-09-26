@@ -1,0 +1,70 @@
+depends_on:
+- T-0011
+new_tests_required: false
+attempts: 0
+notes:
+- The last acceptance command is the regression test for the new check-site.sh check.
+  No separate test file is needed.
+- 'Hero: one <h1> with {{ site.author.name }} set large, then a short static line
+  that renders {{ site.author.typing_text }}. The key keeps its name; only the animation
+  goes away.'
+- For now, keep the GitHub, LinkedIn, email and CV links working as plain, quiet text
+  links under the hero. T-0013 moves them into a Contact section.
+- Remove the status card and the 'gradient descent' footer copy. Do not write new
+  biography.
+- Unlink cat-cursor.js and cat-cursor.css from the layout but leave the files on disk;
+  they are protected in this task. That keeps the change reversible if Tim wants the
+  cat back.
+- If main.js has nothing left once typing is gone, delete it and its <script> tag.
+- Remove the CSS for everything you remove. Add a check to scripts/check-site.sh that
+  fails if index.html, _layouts/*.html or _includes/*.html reference cat-cursor. Add
+  checks only.
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0012
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: 'Turn the hero into a static typographic statement: drop the typing effect,
+  flying cat, status card and joke footer'
+why: G1 asks for a page that 'reads as an engineer's professional site rather than
+  a landing animation', and the charter asks for 'no continuous ambient animation'.
+  The typing effect in main.js, the cat that flies around afterwards (cat-cursor.js/.css)
+  and the status-card microcopy make up the landing animation. The hero should be
+  a large display h1 name above a quiet role line.
+acceptance:
+- bash scripts/check-site.sh
+- grep -q 'site.author.name' index.html
+- grep -q 'site.author.typing_text' index.html
+- bash -c '! grep -q "cat-cursor" _layouts/default.html'
+- bash -c '! grep -Eq "typing-text|typing-cursor|typing-wrapper|window.typingText"
+  index.html'
+- bash -c '! grep -Eq "status-card|status-dot|btn-shine" index.html assets/css/style.css'
+- bash -c '! grep -Eq "typing-|status-card|\.heart" assets/css/style.css'
+- bash -c '! grep -q "main.js" _layouts/default.html || test -f assets/js/main.js'
+- test -f assets/js/cat-cursor.js
+- test -f assets/css/cat-cursor.css
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "<script src=\"/assets/js/cat-cursor.js\"></script>"
+  >> "$d/_layouts/default.html"; ! bash "$d/scripts/check-site.sh"'
+allowed_paths:
+- index.html
+- _layouts/default.html
+- assets/css/style.css
+- assets/js/main.js
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- assets/js/cat-cursor.js
+- assets/css/cat-cursor.css
+- assets/walking_cat_sprite.png
+rank: 2
+merged_sha: ee94e1f
+merged_at: 2026-09-25T11:14:04+0200

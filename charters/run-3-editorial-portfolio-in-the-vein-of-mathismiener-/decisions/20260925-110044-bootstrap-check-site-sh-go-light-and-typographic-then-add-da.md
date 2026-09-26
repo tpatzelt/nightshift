@@ -1,0 +1,12 @@
+# Bootstrap check-site.sh, go light and typographic, then add data-driven sections
+
+_Recorded 20260925-110044 by the NIGHTSHIFT planner._
+
+## Context
+The charter makes `bash scripts/check-site.sh` the test command and requires it to stay green, but the script does not exist in the repo. The sandbox has bash, python3 (stdlib only), node and git, but no ruby or jekyll, so the site cannot be built here. Git history shows a previous run used task ids T-0001 to T-0008 (the dark theme, canvas background, parallax blobs and typing/cat effects that G1 now reverses). /plan/done and /plan/parked are empty.
+
+## Decision
+The first task (T-0009, cited under G1/M1 because G1's definition of done requires check-site.sh to be green) creates check-site.sh as a static gate that uses only bash and python3. Later tasks may add checks to it but never remove any. Then, in charter priority order: remove the canvas and blobs (T-0010); switch to a light theme with Inter as the only web font (T-0011); make the hero a static typographic statement and unlink the typing effect and flying cat, leaving the cat files on disk so the change can be undone (T-0012); add About and Contact sections (T-0013); render projects from _data/projects.yml (T-0014) and contact links from _data/contact.yml, which references the existing site.author handles (T-0015); then add G3 checks and fixes for heading order, focus and reduced motion (T-0016) and for 400px width (T-0017). _config.yml stays protected in every task, since new data goes in _data/. Assumptions: (a) creating the missing gate script is within the charter, which does not forbid it and requires it to exist; (b) task ids start at T-0009 so they do not collide with run 2's T-0001 to T-0008 in git history; (c) 'one family' means Inter only, without Inter Tight; (d) the flying cat and typing effect count as the 'landing animation' / 'continuous ambient animation' the charter rejects; (e) About and project copy is visibly marked placeholder because the repo has no biography.
+
+## Consequences
+Until T-0009 lands, no other task can pass its gate. The gate can only check the source statically. Rendered output, real heading order after Liquid runs, and actual layout width at 400px cannot be verified in the sandbox, so G3 is covered by static proxies. Tim must supply real About copy and project entries; workers will list what is needed. The cat sprite, cat-cursor.js and cat-cursor.css remain on disk but are no longer loaded; a later idle task can delete them or Tim can re-enable them.

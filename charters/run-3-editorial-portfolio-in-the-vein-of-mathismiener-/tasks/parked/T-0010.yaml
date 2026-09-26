@@ -1,0 +1,57 @@
+depends_on:
+- T-0009
+new_tests_required: true
+attempts: 2
+notes:
+- Delete assets/js/background.js and its <script> tag in _layouts/default.html.
+- In main.js, remove animateBackground, handlePointerMove, resetBackground, the related
+  state and the event listeners. Leave the typing effect alone; T-0012 handles it.
+- Remove the .floating-shapes block from index.html, plus the .floating-shapes/.shape/.shape-N
+  rules and their reduced-motion override from style.css.
+- Add a regression check to scripts/check-site.sh that fails if background.js, floating-shapes
+  or bg-canvas reappear. You may add checks there, never remove them.
+- Do not restyle anything else. The light theme is T-0011.
+- "attempt 1: gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"
+- "attempt 2: gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0010
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Remove the ambient canvas background and the blurred parallax blobs from run
+  2
+why: 'G1''s definition of done says ''the ambient canvas background and the blurred
+  parallax blobs from run 2 are gone''. They are assets/js/background.js (a fixed
+  canvas, #bg-canvas), the .floating-shapes/.shape markup in index.html with its CSS,
+  and the pointer-parallax code in main.js that drives --bg-x/--bg-y/--bg-rot.'
+acceptance:
+- bash scripts/check-site.sh
+- test ! -e assets/js/background.js
+- bash -c '! grep -rq "background.js" index.html _layouts'
+- bash -c '! grep -q "floating-shapes" index.html assets/css/style.css'
+- bash -c '! grep -Eq "\.shape(-[0-9])?\b" assets/css/style.css'
+- bash -c '! grep -rq "bg-x\|bg-y\|bg-rot" assets/js assets/css index.html'
+- bash -c '! grep -rq "bg-canvas" assets index.html _layouts'
+allowed_paths:
+- index.html
+- _layouts/default.html
+- assets/js/background.js
+- assets/js/main.js
+- assets/css/style.css
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+rank: 1
+park_reason: "gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"

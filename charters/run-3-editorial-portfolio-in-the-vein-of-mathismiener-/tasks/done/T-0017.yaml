@@ -1,0 +1,53 @@
+depends_on:
+- T-0016
+new_tests_required: false
+attempts: 0
+notes:
+- 'There is no browser in the sandbox, so verify statically: no width or min-width
+  of 400px or more (max-width is fine), no 100vw, clamp() on the display heading,
+  and overflow-wrap: anywhere (or break-word) on body text and links.'
+- 'Remove overflow-x: hidden from body once nothing overflows, so real overflow is
+  not masked. Keep it only if you can explain why in your summary.'
+- Add a static check for 100vw and wide fixed widths to scripts/check-site.sh (add
+  checks only).
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0017
+project: tpatzelt.github.io
+charter_goal: G3
+roadmap_ref: M3
+title: Make the layout legible without horizontal scrolling at 400px wide
+why: 'G3''s definition of done requires no horizontal scrollbar at 400px. Things that
+  can overflow a 400px viewport include 100vw widths, fixed pixel widths, min-widths,
+  long unbroken strings such as the email address, and a display headline without
+  fluid sizing. body currently uses overflow-x: hidden, which masks overflow instead
+  of fixing it.'
+acceptance:
+- bash scripts/check-site.sh
+- bash -c '! grep -q "100vw" assets/css/style.css'
+- bash -c '! grep -Eq "(^|[^-])(min-)?width:\s*([4-9][0-9]{2}|[0-9]{4,})px" assets/css/style.css'
+- grep -q 'overflow-wrap' assets/css/style.css
+- grep -q 'clamp(' assets/css/style.css
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "main{width:100vw}" >> "$d/assets/css/style.css";
+  ! bash "$d/scripts/check-site.sh"'
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "main{min-width:960px}" >> "$d/assets/css/style.css";
+  ! bash "$d/scripts/check-site.sh"'
+allowed_paths:
+- assets/css/style.css
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- _layouts/**
+- assets/js/**
+rank: 3
+merged_sha: b49ae0f
+merged_at: 2026-09-25T21:27:49+0200

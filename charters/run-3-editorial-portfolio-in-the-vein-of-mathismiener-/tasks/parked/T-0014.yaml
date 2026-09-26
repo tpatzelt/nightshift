@@ -1,0 +1,77 @@
+depends_on:
+- T-0013
+new_tests_required: false
+attempts: 2
+notes:
+- 'Create the _data/ directory with projects.yml: a top-level YAML list, each item
+  with title, summary, year (optional), tags (list, optional) and url (optional).
+  Use two-space indent and no tabs.'
+- Use two or more entries, each clearly marked as placeholder (e.g. title 'Placeholder
+  project A', summary '[Placeholder — project description needed from Tim]'). Do not
+  fabricate projects, employers or dates. List the facts needed in your summary.
+- Place <section id="work"> with an <h2> between About and Contact. Render the entries
+  with {% for project in site.data.projects %}, one <article> per entry with an <h3>
+  title. Render url and tags only when present ({% if %}).
+- 'This is an editorial list, not a tile grid: stacked entries separated by whitespace.'
+- Extend scripts/check-site.sh so that every `site.data.NAME` referenced in index.html,
+  _layouts or _includes has a matching _data/NAME.yml (add checks only).
+- 'attempt 1: reviewer said revise: The work is close to done and all gates pass.
+  The diff stays inside the allowed paths, and the placeholders are clearly marked
+  with nothing made up. It adds a stacked editorial list with an h2 and one h3 per
+  entry. The new check-site.sh step only adds checks, and the mktemp gate shows it
+  fails when _data/projects.yml is deleted. One concrete defect needs fixing. In Liquid
+  only nil and false are falsy, so the empty array `tags: []` counts as true. `{%
+  if project.tags %}` therefore outputs an empty `<ul class="work-tags"></ul>` in
+  both placeholder entries. That breaks the t'
+- 'attempt 2: reviewer said revise: All gates pass. The diff stays inside allowed_paths
+  and serves G2/M2. Both placeholders are clearly marked, and nothing about Tim is
+  made up. The attempt-1 defect is fixed: the placeholders no longer have a tags key,
+  so no empty <ul> is rendered. Heading order is correct (one h1, h2 ''Selected work''
+  between About and Contact, h3 per article). Optional year/tags/url render only inside
+  {% if %}. The new check-site.sh step 9 only adds a check and correctly uses the
+  existing `files` list and the re/os imports. The mktemp gate shows it fails when
+  _data/projects.yml is removed, '
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0014
+project: tpatzelt.github.io
+charter_goal: G2
+roadmap_ref: M2
+title: Render a Selected work section from _data/projects.yml
+why: G2's definition of done requires repeated sections such as projects to render
+  from a data structure (_data/*.yml) rather than copy-pasted markup, so adding a
+  project means editing data.
+acceptance:
+- bash scripts/check-site.sh
+- test -f _data/projects.yml
+- grep -q 'site.data.projects' index.html
+- grep -q 'id="work"' index.html
+- grep -qi 'placeholder' _data/projects.yml
+- bash -c 'test $(grep -c "^- " _data/projects.yml) -ge 2'
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; rm "$d/_data/projects.yml"; ! bash "$d/scripts/check-site.sh"'
+allowed_paths:
+- index.html
+- assets/css/style.css
+- _data/projects.yml
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+- assets/js/**
+rank: 4
+park_reason: 'reviewer said revise: All gates pass. The diff stays inside allowed_paths
+  and serves G2/M2. Both placeholders are clearly marked, and nothing about Tim is
+  made up. The attempt-1 defect is fixed: the placeholders no longer have a tags key,
+  so no empty <ul> is rendered. Heading order is correct (one h1, h2 ''Selected work''
+  between About and Contact, h3 per article). Optional year/tags/url render only inside
+  {% if %}. The new check-site.sh step 9 only adds a check and correctly uses the
+  existing `files` list and the re/os imports. The mktemp gate shows it fails when
+  _data/projects.yml is removed, '

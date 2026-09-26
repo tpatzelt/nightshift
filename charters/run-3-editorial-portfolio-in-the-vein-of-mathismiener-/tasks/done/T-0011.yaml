@@ -1,0 +1,62 @@
+depends_on:
+- T-0018
+new_tests_required: false
+attempts: 0
+notes:
+- The acceptance commands are this task's tests. scripts/check-site.sh is not in allowed_paths
+  here, so no test file change is expected.
+- Keep the token names --bg and --text-primary; the acceptance commands parse them
+  as 6-digit hex values.
+- Use one restrained accent token (e.g. --accent) and drop the violet/cyan/pink trio
+  and the soft rgba variants. Hierarchy should come from size and weight, not colour.
+- Load a single Google Fonts family, Inter, with a weight range (e.g. `family=Inter:wght@300..800`).
+  Inter Tight is a separate family, so leave it out to stay within 'one family'. Remove
+  the other font families from the link and from the CSS stacks (--font-main, --font-mono),
+  and use a system monospace stack if any mono is still needed.
+- Set theme-color to the new --bg. Recolouring the favicon is optional.
+- Update existing rules (name, buttons, status card, footer, focus, selection) so
+  text stays readable on the light ground. Do not change markup; the hero restructure
+  is T-0012.
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0011
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: 'Switch to a light, neutral theme set in Inter: near-white ground, near-black
+  text, one accent'
+why: G1 needs the page to load light-themed and typographic. style.css is currently
+  a dark theme with three accents and radial gradient washes, and the layout loads
+  Space Grotesk and JetBrains Mono. G3 allows no web fonts beyond one family, so Inter
+  (variable weight) replaces both.
+acceptance:
+- bash scripts/check-site.sh
+- python3 -c "import re;c=re.search(r'--bg:\s*#([0-9a-fA-F]{6})',open('assets/css/style.css').read()).group(1);assert
+  sum(int(c[i:i+2],16) for i in (0,2,4))>=705"
+- python3 -c "import re;c=re.search(r'--text-primary:\s*#([0-9a-fA-F]{6})',open('assets/css/style.css').read()).group(1);assert
+  sum(int(c[i:i+2],16) for i in (0,2,4))<=180"
+- grep -q 'family=Inter' _layouts/default.html
+- bash -c '! grep -Eq "Space\+Grotesk|Space Grotesk|JetBrains" _layouts/default.html
+  assets/css/style.css assets/css/cat-cursor.css'
+- bash -c '! grep -q "radial-gradient" assets/css/style.css'
+- bash -c '! grep -q "#0a0b14" _layouts/default.html'
+- bash -c 'test $(grep -o "fonts.googleapis.com/css2?[^\"]*" _layouts/default.html
+  | grep -o "family=" | wc -l) -eq 1'
+allowed_paths:
+- assets/css/style.css
+- _layouts/default.html
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- assets/js/**
+rank: 1
+merged_sha: 2b1e78e
+merged_at: 2026-09-25T11:10:59+0200
