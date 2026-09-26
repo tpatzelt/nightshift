@@ -74,6 +74,29 @@ def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+CLIP_MARKER = "\n  […clipped…]\n"
+
+
+def clip(text: str, limit: int) -> str:
+    """Shorten a reason to `limit` characters, keeping both of its ends.
+
+    A reviewer's verdict opens with what the work got right and names the
+    defect last, so text[:limit] threw away the only part the next attempt
+    needed. T-0014 was parked on a reason that stopped at "...the mktemp gate
+    shows it fails when _data/projects.yml is removed, " and the re-issues
+    never learned what to fix. A gate report is the other way round, failures
+    first, so neither end can be the one to drop.
+    """
+    text = text.strip()
+    if len(text) <= limit:
+        return text
+    head = max(0, limit * 2 // 5)
+    tail = max(0, limit - head - len(CLIP_MARKER))
+    if not tail:
+        return text[:limit]
+    return text[:head].rstrip() + CLIP_MARKER + text[-tail:].lstrip()
+
+
 def write_atomic(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
@@ -1489,10 +1512,12 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         else "reviewer produced no usable JSON")
     task = dict(task)
     task["attempts"] = task.get("attempts", 0) + 1
-    task.setdefault("notes", []).append(f"attempt {task['attempts']}: {reason[:600]}")
+    task.setdefault("notes", []).append(
+        f"attempt {task['attempts']}: {clip(reason, 4000)}")
     output = gate.failing_output()
     if output:
-        task["notes"].append(f"attempt {task['attempts']} gate output:\n{output[:2500]}")
+        task["notes"].append(
+            f"attempt {task['attempts']} gate output:\n{clip(output, 4000)}")
 
     if task["attempts"] >= 2:
         # Only a terminal outcome counts against the streak. A retry is the loop
@@ -1500,10 +1525,10 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         # and usually merges - so counting it as well let one unmergeable task eat
         # two thirds of the budget and pause a run that was making progress.
         state["consecutive_failures"] = state.get("consecutive_failures", 0) + 1
-        task["park_reason"] = reason[:600]
+        task["park_reason"] = clip(reason, 1500)
         plan.save_task(task, "parked")
         state["planner_due"] = True
-        ntfy(f"{tid} {task['title']} parked after 2 attempts.\n{reason[:400]}",
+        ntfy(f"{tid} {task['title']} parked after 2 attempts.\n{clip(reason, 400)}",
              title="NIGHTSHIFT: parked", priority="high", tags="warning")
         state_save(state)
         return "parked"

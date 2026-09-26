@@ -192,5 +192,32 @@ try:
 finally:
     ns.load_config = _real_cfg
 
+print("\n--- clip: a park reason keeps the end that names the defect ---")
+check("short text is returned whole", ns.clip("all gates passed", 100), "all gates passed")
+check("text at the limit is returned whole", ns.clip("a" * 50, 50), "a" * 50)
+check("surrounding whitespace goes", ns.clip("  spaced  ", 100), "spaced")
+long = "praise " * 100 + "THE DEFECT IS HERE"
+clipped = ns.clip(long, 200)
+check("an over-long reason is clipped to the limit", len(clipped) <= 200, True)
+check("the head survives", clipped.startswith("praise"), True)
+check("the tail survives", clipped.endswith("THE DEFECT IS HERE"), True)
+check("the clip is marked", ns.CLIP_MARKER.strip() in clipped, True)
+# The verdict that actually cost run 3 three re-issues: text[:600] stopped one
+# sentence before the defect, so T-0019 and T-0020 repeated the work blind.
+t14 = ("reviewer said revise: All gates pass. The diff stays inside allowed_paths "
+       "and serves G2/M2. Both placeholders are clearly marked, and nothing about "
+       "Tim is made up. The attempt-1 defect is fixed: the placeholders no longer "
+       "have a tags key, so no empty <ul> is rendered. Heading order is correct "
+       "(one h1, h2 'Selected work' between About and Contact, h3 per article). "
+       "Optional year/tags/url render only inside {% if %}. The new check-site.sh "
+       "step 9 only adds a check and correctly uses the existing files list and the "
+       "re/os imports. The mktemp gate shows it fails when _data/projects.yml is "
+       "removed, so the guard is real. One defect remains: the h2 id is duplicated.")
+check("the old 600-char head dropped the defect",
+      "One defect remains" in t14[:600], False)
+check("clip at 600 keeps the defect",
+      "One defect remains: the h2 id is duplicated." in ns.clip(t14, 600), True)
+check("clip at 1500 keeps the whole verdict", ns.clip(t14, 1500), t14)
+
 print(f"\n{'ALL GOVERNOR TESTS PASSED' if not failures else 'FAILURES: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)
