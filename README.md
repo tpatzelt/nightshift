@@ -60,6 +60,27 @@ docker compose stop                # full stop; fires the healthchecks.io alert
 From the phone, on the ntfy `-cmd` topic, every message prefixed with `CMD_SECRET`:
 `pause`, `resume`, `stop`, `status`, `digest`.
 
+## Egress
+
+Agents sit on the `--internal` `nightshift-jail` network, and the squid proxy in
+`proxy/` is their only way out. Since 2026-09-22 that way out is **open to any
+public host on ports 80 and 443**. It was opened so run 1 could work against the
+live Brave and OpenRouter APIs. `proxy/allowlist.txt` is still mounted into the
+proxy but no longer consulted, so adding a domain to it changes nothing. What
+still holds:
+
+- squid denies every private, loopback, link-local and CGNAT destination
+  (`private_dst` in `squid.conf`), even when a public name resolves into those ranges.
+  That keeps agents off the LAN and the other containers.
+- inside dind, `DOCKER-USER` drops all jail traffic except to the proxy port.
+- `sandbox/` managed settings and the guard hook deny curl, wget, ssh and `git push`.
+
+So a charter cannot rely on a service being unreachable. If agents must not
+call something, the charter has to forbid it and the sandbox must not hold
+that service's credential. To check egress, run a request from a container on
+`nightshift-jail` (the agent image has Python but no curl). A request from the
+dind container itself bypasses the proxy and tells you nothing.
+
 ## Layout
 
 | Path | What |
@@ -69,7 +90,7 @@ From the phone, on the ntfy `-cmd` topic, every message prefixed with `CMD_SECRE
 | `secrets/oauth_token` | Claude OAuth token, mounted into the orchestrator only |
 | `orchestrator/` | the Python loop, the queue (`runs.py`), the dashboard (`web.py`, `static/`), config, prompts, tests |
 | `sandbox/` | agent image, managed settings, guard hook |
-| `proxy/` | squid egress allowlist |
+| `proxy/` | squid egress proxy (`squid.conf`) and a domain list it no longer enforces — see [Egress](#egress) |
 | `dind-init/` | iptables jail script, applied inside dind |
 | `data/` | plan, bare repos, worktrees, state, logs, digests, backups — untracked |
 | `charters/` | one directory per finished run: charter, tasks, decisions, result |
