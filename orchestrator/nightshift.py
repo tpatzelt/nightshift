@@ -1489,7 +1489,9 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         else "reviewer produced no usable JSON")
     task = dict(task)
     task["attempts"] = task.get("attempts", 0) + 1
-    task.setdefault("notes", []).append(f"attempt {task['attempts']}: {reason[:600]}")
+    # Reviewer verdicts run 2-3k characters and list numbered fixes; a note cut at
+    # 600 handed the retry only the first fix and parked the task over the rest.
+    task.setdefault("notes", []).append(f"attempt {task['attempts']}: {reason[:8000]}")
     output = gate.failing_output()
     if output:
         task["notes"].append(f"attempt {task['attempts']} gate output:\n{output[:2500]}")
