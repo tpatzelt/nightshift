@@ -1,0 +1,79 @@
+depends_on:
+- T-0012
+new_tests_required: true
+attempts: 0
+notes:
+- Start from the current tree. Nothing from T-0001, T-0011 or T-0013 was merged. The
+  tree has no src/pendel/hafas yet, so create it.
+- Use httpx only. Add no dependencies. Make no live HTTP calls. Tests use the hafas_replay
+  fixture from tests/conftest.py, or their own httpx.MockTransport.
+- 'API: locations(query), departures(stop_id, when, duration), journeys(from_id, to_id,
+  departure), trip(trip_id). The base URL comes from env PENDEL_HAFAS_BASE_URL, default
+  https://v6.bvg.transport.rest. The httpx client is injected.'
+- The cache key is path plus sorted params. The TTL (default ttl_seconds=30, overridable)
+  uses an injected monotonic clock callable, so tests never sleep.
+- 'The cache must be bounded. Evict expired entries on insert and cap the cache at
+  max_entries (default 256), dropping the oldest first. Test: 1000 departures calls
+  with distinct `when` leave len(cache) <= max_entries.'
+- 'REQUIRED TTL test (this was the blocking issue in T-0013): call departures(A).
+  Advance the clock 9 s and call the same A again; assert exactly 1 request was sent.
+  Advance past the TTL and call the same A again; assert 2 requests and len(cache)
+  == 1. Add a separate test that an expired entry with a different key is purged on
+  insert, meaning removed from the cache and not just shadowed.'
+- Backoff on 429/503 uses an injected sleep with delays 0.5, 1 and 2 s and at most
+  3 retries. Honour a numeric Retry-After, capped at 10 s. Treat negative, infinite,
+  NaN or non-numeric Retry-After values (e.g. an HTTP-date, '-5', 'nan') as absent
+  and fall back to the fixed delay. After the last retry, raise HafasError. Other
+  4xx/5xx raise HafasError at once with no retry.
+- 'Keep every test the T-0013 reviewers required: one MockTransport test per endpoint
+  asserting request.url.params (from/to/departure on /journeys, when/duration on departures,
+  query on /locations); Retry-After ''3'' -> sleep 3.0 on a 429; ''20'' -> 10.0; an
+  HTTP-date -> 0.5; the cache key does not depend on param order; exhausted retries
+  raise HafasError.'
+- 'Do the hardening from the T-0013 review here, and test each item: percent-encode
+  trip_id in the path (urllib.parse.quote with safe=''''); wrap httpx.TransportError
+  and invalid JSON in HafasError; return a deep copy of cached values so callers cannot
+  mutate the cache; accept only timezone-aware datetimes and convert them to Europe/Berlin
+  (zoneinfo) before isoformat, raising ValueError for naive datetimes.'
+- Any fixture you add under tests/fixtures/hafas/client/ is hand-written. Name or
+  document it so it is never mistaken for a real recording for the G1 definition of
+  done.
+- If anything blocks you, report the exact command and its error output in your final
+  report.
+created: 2026-09-29T09:40:47+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0019
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: HAFAS REST client with bounded TTL cache and 429/503 backoff (retry of parked
+  T-0013 with its one blocking test fixed)
+why: 'G1 reads departures, remarks and journeys from v6.bvg.transport.rest. The charter
+  requires production code to cache and back off, because the public instance allows
+  about 100 req/min. The G3 scheduler (T-0009) fetches through this client. T-0013
+  was parked after attempt 2 on a single blocking issue: its TTL test did not refetch
+  the same key. Nothing from T-0013 was merged.'
+acceptance:
+- uv run pytest -q tests/test_hafas_client.py
+- uv run pytest -q
+- uv run python -c "import pendel.hafas"
+allowed_paths:
+- src/pendel/hafas/**
+- tests/test_hafas_client.py
+- tests/fixtures/hafas/client/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- src/pendel/commute.py
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 62de0a6
+merged_at: 2026-09-29T09:46:15+0200

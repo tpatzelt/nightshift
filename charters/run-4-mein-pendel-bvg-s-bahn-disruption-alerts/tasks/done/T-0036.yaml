@@ -1,0 +1,109 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- NEVER contact api.telegram.org or any messaging service (charter constraint). Every
+  test must use httpx.Client(transport=httpx.MockTransport(...)). The autouse socket
+  guard in tests/conftest.py must stay in force. Do not create or use any real bot
+  token; use a dummy string like 'dummy-token'.
+- Add src/pendel/telegram_poll.py with `poll_once(conn, http_client, bot_token, channel,
+  offset, *, long_poll_s=25) -> int`. It sends GET https://api.telegram.org/bot<token>/getUpdates
+  with params offset and timeout=long_poll_s, and passes each update in result[] to
+  pendel.telegram_link.handle_update(conn, update, channel). It returns max(update_id)+1,
+  or the unchanged offset when there are no updates. Reuse the `_TELEGRAM_API_BASE`
+  value by importing it from pendel.notify.channel. Do not edit that module.
+- 'Error handling follows the style of notify/channel.py. For an HTTP error, a non-JSON
+  body or ok=false, raise a poll error whose message never contains the URL or the
+  bot token (httpx''s default messages include the URL, so do not chain them: use
+  `from None`). One update that makes handle_update raise must be logged and skipped.
+  It must not stop the others, and the offset must still advance past it.'
+- Add `run_forever(conn, http_client, bot_token, channel, *, sleep=time.sleep)`. It
+  loops on poll_once, catches and logs any exception, and backs off with sleep(5)
+  after a failure, so a Telegram outage never ends the loop. Tests stop the loop by
+  injecting a sleep that raises a sentinel exception after N calls.
+- Add `main()` and `if __name__ == '__main__'`. main() reads PENDEL_TELEGRAM_BOT_TOKEN.
+  If it is unset or empty, it logs one info line and returns (exit code 0), so a deployment
+  without Telegram does not crash-loop. Otherwise it opens pendel.db.connect(), builds
+  httpx.Client(timeout=long_poll_s+10) and TelegramChannel(client, bot_token=token),
+  and calls run_forever.
+- 'The offset is kept in memory only. This is safe because handle_update is idempotent:
+  tokens are single-use, and a replayed /start gets the neutral reply. Do not add
+  a migration. Record this assumption in the commit message.'
+- 'Required tests: (1) one getUpdates response with a valid /start <token> update
+  (build the token with create_link, with PENDEL_TELEGRAM_BOT_USERNAME monkeypatched)
+  links the channel row and sends exactly one confirmation through the channel; (2)
+  the returned offset is last update_id+1, and the next request carries that offset;
+  (3) an empty result returns the offset unchanged; (4) HTTP 500 and ok=false raise,
+  and the exception text contains neither ''dummy-token'' nor ''api.telegram.org'';
+  (5) an update that makes handle_update raise is skipped and the next one is still
+  processed; (6) run_forever survives a failing poll and calls sleep; (7) main() with
+  no token returns without building a client. Use FakeChannel from pendel.notify for
+  the replies, or a MockTransport-backed TelegramChannel.'
+- 'attempt 1: reviewer said revise: The poller leaks the bot token into production
+  logs. main() calls logging.basicConfig(level=logging.INFO), and poll_once builds
+  the URL as f"{_TELEGRAM_API_BASE}/bot{bot_token}/getUpdates". httpx logs every request
+  at INFO on the ''httpx'' logger (checked: .venv/.../httpx/_client.py:1025, ''HTTP
+  Request: %s %s ...'' with the full URL). So once a token is set, the full bot token
+  goes to stdout and the container logs on every long-poll, at least once every 25
+  s, forever. That defeats the task''s explicit rule that errors never expose the
+  URL or token, and it is a real secret leak in a deployed homelab. Fix it inside
+  the allowed paths: in main() (or at module level), set logging.getLogger(''httpx'').setLevel(logging.WARNING),
+  and also httpcore. Then add a test that uses caplog at INFO around a poll_once call
+  through the MockTransport and asserts that ''dummy-token'' appears in no record,
+  or a test that main()''s logging setup raises the httpx logger above INFO. runner.py
+  uses the same basicConfig pattern and may have the same problem for sendMessage.
+  It is protected here, so record it as a follow-up rather than fixing it. Smaller
+  points: (a) test 7 is supposed to prove main() returns without building a client,
+  but it only guards db.connect. Also monkeypatch telegram_poll.httpx.Client (or TelegramChannel)
+  to raise, so the test says what it claims. (b) In poll_once, the except block calls
+  update.get(''update_id''), which raises AttributeError if an item in result is not
+  a dict. That would escape the per-update isolation and abort the whole batch without
+  advancing the offset, so non-dict updates would be replayed forever. Guard with
+  isinstance(update, dict) before handling. Everything else is in scope, uses only
+  the two allowed files, adds no dependency, and has meaningful offline tests. The
+  in-memory offset assumption is recorded as the task required.'
+created: 2026-09-29T23:22:01+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0036
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Telegram update poller: `python -m pendel.telegram_poll` feeds getUpdates
+  results into telegram_link.handle_update (offline MockTransport tests)'
+why: G3 requires Telegram linking via a /start deep-link token. create_link and handle_update
+  exist and are tested against a fake, but nothing in production ever fetches Telegram
+  updates and passes them to handle_update. A real user who opens the deep link is
+  therefore never linked. This task adds the missing poller. It is tested only through
+  httpx.MockTransport and never contacts api.telegram.org.
+acceptance:
+- uv run pytest -q tests/test_telegram_poll.py
+- uv run python -c "import pendel.telegram_poll"
+- uv run pytest -q
+allowed_paths:
+- src/pendel/telegram_poll.py
+- tests/test_telegram_poll.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/telegram_link.py
+- src/pendel/notify/**
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/scheduler.py
+- src/pendel/runner.py
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- src/pendel/app.py
+- deploy/**
+- Dockerfile
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 5dbc8a4
+merged_at: 2026-09-29T23:29:41+0200

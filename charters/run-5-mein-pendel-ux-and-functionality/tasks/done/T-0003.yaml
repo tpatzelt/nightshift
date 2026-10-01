@@ -1,0 +1,46 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Add a pure function to src/pendel/engine.py, e.g. `line_choices(departures_json)
+  -> list[str]`. It returns the unique line names from departures[].line.name, deduplicated
+  with the existing _line_key normalisation. Use a stable, readable order, e.g. grouped
+  by line.product and then natural-sorted so S3 < S41 < S5. Skip entries without a
+  line name.
+- Test it against the recorded tests/fixtures/hafas/recorded/departures_undisturbed.json
+  (Alexanderplatz 900100003). The result must equal the set of line names in that
+  file (100, 200, 248, 300, M2, M4, M5, M6, S3, S5, S7, S9, U2, U5, U8) with no duplicates.
+  Add edge-case tests for a missing line and for empty departures.
+- The helper does no I/O.
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 200
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0003
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Pure helper: line choices from an origin''s departures response'
+why: 'G1: the line checkboxes must list the lines that actually depart from the chosen
+  origin, read from its departures, so no visitor types a line name.'
+acceptance:
+- uv run pytest -q tests/test_engine_recorded.py tests/test_engine.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine_recorded.py
+- tests/test_engine.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+merged_sha: 9c50a21
+merged_at: 2026-09-30T13:30:59+0200

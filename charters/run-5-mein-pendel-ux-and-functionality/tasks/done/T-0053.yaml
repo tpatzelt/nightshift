@@ -1,0 +1,86 @@
+depends_on:
+- T-0038
+new_tests_required: true
+attempts: 0
+notes:
+- Keep it small. Earlier attempt 2 ran out of budget without reporting. Do the 4 steps
+  below, run the tests, and report.
+- '1) app.py: add `@lru_cache(maxsize=1) def get_channels() -> dict[str, Channel]:
+  return runner.build_channels(httpx.Client(timeout=10.0), os.environ)`, next to get_hafas_client
+  (app.py:126). runner.py does not import app, so `from pendel import runner` is safe.
+  Import Channel and ChannelSendError from pendel.notify.'
+- '2) app.py: add `@app.post(''/notifications/channels/{channel_id}/test'')` and write
+  it as a plain `def`, NOT `async def`, so the blocking httpx send runs in FastAPI''s
+  threadpool. This was the reviewer''s blocking issue on attempt 1. Inject `channels
+  = Depends(get_channels)`. Find the row by id in db.list_channels(db_conn, uid),
+  only when the uid cookie''s user exists. If the row is missing (unknown or foreign
+  id), has target NULL (pending), or there is no cookie: send nothing and return RedirectResponse(''/notifications'',
+  303). Otherwise call channels[row[''kind'']].send(row[''target''], t(''notifications_test_message''))
+  once, then return RedirectResponse(''/notifications?test=sent'', 303). On ChannelSendError,
+  render notifications.html with _notifications_context plus test_error=t(''notifications_test_error'')
+  and status_code=502.'
+- '3) notifications.html: inside each linked channel''s <li> (only when channel.linked),
+  add a second POST form to /notifications/channels/{{ channel.id }}/test with a submit
+  button t(''notifications_test_button''). Show <p role="status"> t(''notifications_test_sent'')
+  when request.query_params.get(''test'') == ''sent'' (pass it as a context flag from
+  notifications_page). Show <p class="error" role="alert">{{ test_error }}</p> when
+  test_error is set. i18n.py: add DE+EN keys notifications_test_button (''Testnachricht
+  senden'' / ''Send test message''), notifications_test_message (''Testnachricht von
+  Mein Pendel'' / ''Test message from Mein Pendel''), notifications_test_sent (''Testnachricht
+  gesendet.'' / ''Test message sent.'') and notifications_test_error (''Testnachricht
+  konnte nicht gesendet werden.'' / ''The test message could not be sent.'').'
+- '4) tests/test_web_notifications.py: reuse _seed_user, _insert_telegram_channel
+  and _insert_ntfy_channel. Every test sets app.dependency_overrides[get_channels]
+  = lambda: {''telegram'': fake, ''ntfy'': fake} with a pendel.notify.FakeChannel,
+  and clears it in a fixture teardown. Tests: (a) a linked channel gets exactly one
+  message (len(fake.sent)==1) with the right target, a 303 to /notifications?test=sent,
+  and the followed page has role="status"; (b) a pending telegram row (insert with
+  target NULL, linked_at NULL), a foreign user''s channel, an unknown id and a request
+  with no cookie each send nothing; (c) a fake whose send raises ChannelSendError
+  gives 502, role="alert" and the DE error text, and is called exactly once; (d) the
+  page shows the test button only for linked channels.'
+- Never construct TelegramChannel or NtfyChannel in a test. Never contact api.telegram.org
+  or any ntfy server.
+created: 2026-10-01T05:02:15+0200
+max_diff_lines: 300
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0053
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'Notifications page: ''send test message'' per linked channel through an overridable
+  get_channels dependency (re-issue of parked T-0039 with the reviewer fix)'
+why: 'G5: the notifications page must offer a ''send test message'' action. Right
+  now app.py has no access to channels and no such route. Parked T-0039 was nearly
+  accepted on attempt 1; the reviewer''s only blocking issue was a blocking channel
+  send() running on the event loop. Attempt 2 ended with no status. T-0040, the G5
+  definition-of-done test, depends on this task.'
+acceptance:
+- uv run pytest -q tests/test_web_notifications.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/notifications.html
+- src/pendel/i18n.py
+- tests/test_web_notifications.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- src/pendel/notify/**
+- src/pendel/runner.py
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 0
+merged_sha: 3120f84
+merged_at: 2026-10-01T05:13:51+0200

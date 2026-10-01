@@ -1,0 +1,79 @@
+depends_on:
+- T-0012
+new_tests_required: true
+attempts: 2
+notes:
+- Start from the current tree. Nothing from parked T-0002 was merged.
+- 'Live-call budget for this task: at most 20 requests to v6.bvg.transport.rest in
+  total, with a sleep of at least 1 s between them. Never loop over stations. Count
+  every request, including scratch probes, and report the exact total in your final
+  report.'
+- The script makes HTTP calls only when given an explicit flag such as --record. `--help`
+  and imports must never touch the network. Use httpx, which is already a dependency.
+  Add no dependencies.
+- 'Trim inside the script: keep a few departures per file and drop unused fields,
+  but keep tripId, when, plannedWhen, delay, cancelled, line (id, name, product),
+  stop.id, and remarks (type, code, summary, text). Only trim, never rewrite values.
+  All four files must be real and verbatim-trimmed. Do not derive any of them.'
+- Construction means a remark that really describes Bauarbeiten or construction work
+  on the departure's line or stop (the S-Bahn Ring S41/S42 is a good place to look).
+  'Additional service' or hint remarks do not count.
+- Delay means a departure with delay >= 600 seconds. Undisturbed means a response
+  where no departure is cancelled, none is delayed by 5 minutes or more, and no remark
+  is of type warning.
+- 'tests/fixtures/hafas/README.md lists for each file: request path and params, UTC
+  recording time, kind, and ''verbatim-trimmed''.'
+- 'tests/test_fixtures_shape.py checks each file parses and has a ''departures'' list,
+  and also checks each kind: cancellation has a departure with cancelled true, delay
+  has one with delay >= 600, construction has a remark whose text mentions Bau/construction,
+  undisturbed has none of these. It also checks that every departures_*.json is listed
+  in the README. Tests stay offline.'
+- If the sandbox or its guard blocks network access, stop at once and report blocked
+  with the exact command and its error output. Do not try other tools or routes to
+  get around it. If one kind cannot be found live within the budget, report blocked
+  and name the missing kind. Do not invent or derive it.
+- "attempt 1: gate failures:\n  - worker reported status='blocked', not 'done'"
+- "attempt 2: gate failures:\n  - worker reported status='blocked', not 'done'"
+created: 2026-09-29T09:30:36+0200
+max_diff_lines: 600
+timeout_min: 60
+max_turns: 80
+status: parked
+id: T-0015
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Record real HAFAS departures fixtures for four core kinds: undisturbed, cancellation,
+  delay, construction remark (part 1 of parked T-0002)'
+why: G1's definition of done needs recorded fixtures of real disruption kinds plus
+  an undisturbed day, and the engine (T-0004) cannot be tested without them. Parked
+  T-0002 tried to record every kind, the journeys and the locations in one go. Attempt
+  1 was sent back for revision and attempt 2 came back blocked with no reason given.
+  Attempt 1 did find real cancellation, delay and construction examples, so this smaller
+  slice records only those plus an undisturbed response.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/README.md
+- test -f tests/fixtures/hafas/departures_undisturbed.json
+- test -f tests/fixtures/hafas/departures_cancellation.json
+- test -f tests/fixtures/hafas/departures_delay.json
+- test -f tests/fixtures/hafas/departures_construction.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/departures_*.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 1
+park_reason: "gate failures:\n  - worker reported status='blocked', not 'done'"

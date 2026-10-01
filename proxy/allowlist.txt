@@ -1,7 +1,10 @@
-# NIGHTSHIFT egress allowlist — one domain per line, comments with #.
-# squid allows CONNECT :443 to these and nothing else. Every other destination,
-# and every RFC1918 / link-local / CGNAT address, is denied even if a name
-# resolves to it.
+# NIGHTSHIFT egress allowlist — NOT ENFORCED since 2026-09-22.
+# squid.conf no longer consults this file: egress is open to any public host on
+# ports 80/443 (see "what they may do" in squid.conf). What is still denied is
+# every RFC1918 / link-local / CGNAT / loopback address, even if a name resolves
+# to it. This file is kept because the proxy container still mounts it
+# (nightshift.py ensure_proxy), and as the record of what the charters need —
+# the list to go back to if egress is ever closed again.
 
 # Claude Code itself
 api.anthropic.com
@@ -29,3 +32,6 @@ codeload.github.com
 github.com
 release-assets.githubusercontent.com
 ftp.mozilla.org
+
+# Public VBB/BVG HAFAS REST API (keyless, read-only) — mein-pendel run
+v6.bvg.transport.rest

@@ -1,0 +1,81 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Add a mode to scripts/record_fixtures.py (e.g. `--locations QUERY...`) that can
+  be tested offline. It makes exactly one GET /locations?query=<q>&results=5 per query,
+  at least 1.5 s apart, and never loops or retries. Add a trim that keeps only type,
+  id and name of each entry (plus station id/name if present), in response order,
+  with values unedited.
+- 'Record exactly two queries, ''Alexanderplatz'' and ''Ostkreuz'': two live requests
+  in total. If the API errors, put the exact error in your followups and report blocked.
+  Do not put synthetic data under recorded/.'
+- Keep the HAFAS list shape (a JSON array) so HafasClient.locations and app.stops
+  read it unchanged. Write with indent=1 like the existing trim, and keep each file
+  well under 100 lines.
+- 'Add a row for each file to tests/fixtures/hafas/recorded/README.md: query, recorded
+  UTC time, kind verbatim-trimmed.'
+- Add a test to tests/test_web_stops.py that replays locations_alexanderplatz.json
+  through /stops?q=Alexanderplatz and checks that the station name is listed.
+- Never edit the existing departures_*.json recordings.
+- 'attempt 1: reviewer said revise: The work is good, but one statement in the fixture
+  provenance docs is wrong. In tests/fixtures/hafas/recorded/README.md the new paragraph
+  says "only fields the app does not read (`type`, `id`, `name`, plus `station` sub-fields
+  when present) are kept". That says the opposite of what trim_locations() does: it
+  keeps the fields the app reads (app.py:229 filters on type, id and name) and drops
+  everything else. Please change it to something like "only the fields the app reads
+  (`type`, `id`, `name`, plus `station` id/name when present) are kept; every other
+  field is dropped, and no value is edited." This README is the record of how the
+  recorded data was made, so it needs to be accurate. Everything else checks out.
+  --locations makes one GET per query with a 1.5 s gap and no retry or loop, uses
+  the existing BASE_URL and httpx, and does nothing at import time or on --help. The
+  fixtures are JSON arrays written with indent=1, 27 lines each. The Alexanderplatz
+  file contains 900100003 and the Ostkreuz file contains 900120003. The recorded times
+  are 2 s apart and match the task''s creation time. The recorded fuzzy matches (Westkreuz
+  900024102, Südkreuz 900058101, a POI with type location) look like real HAFAS output,
+  not synthetic data. No departures_*.json recording was touched, every changed path
+  is in allowed_paths, and no dependency was added. The new test is meaningful: it
+  fails if the fixture is removed and it goes through the real /stops filter path.
+  Optional: the station sub-object branch of the trim has no test coverage; the worker
+  already listed this as a followup.'
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0001
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record real /locations fixtures for 'Alexanderplatz' and 'Ostkreuz'
+why: G1's definition of done walks the setup flow on recorded fixtures. tests/fixtures/hafas/recorded/
+  only has departures, with no recorded stop-search response for the origin or destination
+  search screens.
+acceptance:
+- test -f tests/fixtures/hafas/recorded/locations_alexanderplatz.json
+- test -f tests/fixtures/hafas/recorded/locations_ostkreuz.json
+- uv run python -c "import json; d=json.load(open('tests/fixtures/hafas/recorded/locations_alexanderplatz.json'));
+  assert any(e.get('id')=='900100003' for e in d)"
+- uv run python -c "import json; d=json.load(open('tests/fixtures/hafas/recorded/locations_ostkreuz.json'));
+  assert any(e.get('id')=='900120003' for e in d)"
+- uv run python scripts/record_fixtures.py --help
+- uv run pytest -q tests/test_web_stops.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/recorded/locations_*.json
+- tests/fixtures/hafas/recorded/README.md
+- tests/test_web_stops.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+merged_sha: 6079fc4
+merged_at: 2026-09-30T13:25:04+0200

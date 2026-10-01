@@ -1,0 +1,59 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- 'Put the section between About and Contact: <section id="work" aria-labelledby="work-title">
+  with an h2 ''Selected work'' and one <article> with an h3 per entry, rendered by
+  {% for project in site.data.projects %}.'
+- Each entry has title and summary. year, tags and url are optional and render only
+  inside {% if %}. Do not render an empty <ul> when tags is missing.
+- 'Do not make up any of Tim''s projects. Use two entries that are clearly marked
+  as placeholders (e.g. title ''[Placeholder project]''). Add a YAML comment listing
+  what Tim needs to supply: project names, one-line summaries, years, links.'
+- check-site.sh steps 1–10 already exist. Add your check as step 11 (index.html loops
+  over site.data.projects and _data/projects.yml exists and is non-empty). Only add
+  checks; never remove or weaken existing ones.
+- Use spaces, not tabs, in YAML (check 8). Do not edit _config.yml.
+- "attempt 1: gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"
+- "attempt 2: gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"
+created: 2026-09-25T11:21:32+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0019
+project: tpatzelt.github.io
+charter_goal: G2
+roadmap_ref: M2
+title: Render a Selected work section from _data/projects.yml (re-issue of parked
+  T-0014)
+why: G2's definition of done needs at least three content sections beyond the hero,
+  and the list-shaped ones must render from data. Right now index.html has only About
+  and Contact, and there is no _data directory. A Selected work section built with
+  a Liquid loop over site.data.projects is the missing third section. T-0014 passed
+  every gate but was parked on a reviewer 'revise' whose reason was cut off, so this
+  re-issue repeats that work in full.
+acceptance:
+- bash scripts/check-site.sh
+- test -f _data/projects.yml
+- grep -q 'site.data.projects' index.html
+- grep -q 'Selected work' index.html
+- grep -qi 'placeholder' _data/projects.yml
+- d=$(mktemp -d) && cp -r . "$d" && rm "$d/_data/projects.yml" && ! bash "$d/scripts/check-site.sh"
+allowed_paths:
+- index.html
+- _data/projects.yml
+- scripts/check-site.sh
+- assets/css/style.css
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- _layouts/default.html
+rank: 0
+park_reason: "gate failures:\n  - new_tests_required is set but no test file was added\
+  \ or changed"

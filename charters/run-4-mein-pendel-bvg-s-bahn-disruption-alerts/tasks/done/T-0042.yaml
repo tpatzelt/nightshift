@@ -1,0 +1,58 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Add tests to tests/test_scheduler.py whose names contain 'dst', so `-k dst` selects
+  them (pytest exits 5 if nothing matches). Reuse the existing helpers _insert_commute,
+  _insert_channel, _hafas, _load('synthetic_undisturbed.json') and FakeChannel, and
+  follow test_commute_due_at_lead_boundary_but_not_one_minute_earlier.
+- Weekdays use 0=Monday..6=Sunday. Both 2026 transition days are Sundays, so insert
+  commutes with weekdays='6'.
+- 'Required cases, with the default 30 min lead: (a) 2026-03-29 (spring forward),
+  window 06:00-07:00: no departures request at 05:29 Berlin, exactly one at 05:30
+  Berlin. (b) 2026-10-25 (fall back), same window and same assertions. (c) A window
+  that starts in the non-existent hour on 2026-03-29 (e.g. 02:30-03:30): assert the
+  scheduler does not crash and becomes due at a single well-defined instant consistent
+  with commute.window_bounds/_normalise. Assert the instant that window_bounds returns,
+  not a hard-coded guess.'
+- Build tick instants as timezone-aware Berlin datetimes (zoneinfo), and also check
+  one case by passing the same instant in UTC, to prove tick() compares UTC instants.
+- Only if a test exposes a real bug in src/pendel/scheduler.py, fix it there with
+  the smallest change. Do not edit commute.py. No network, no new fixtures, no new
+  dependencies.
+created: 2026-09-30T03:42:56+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0042
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Scheduler DST tests: commutes become due at the right instant on the 2026
+  spring-forward and fall-back Sundays'
+why: The charter says times are Europe/Berlin throughout and DST transitions are tested.
+  commute.py, engine and alternatives have DST tests, but tests/test_scheduler.py
+  has none. Scheduler._due_commute turns the Berlin window into UTC with the lead
+  time, and G3 says a commute is checked shortly before its departure window, so the
+  lead boundary must hold across the 2026-03-29 and 2026-10-25 transitions.
+acceptance:
+- uv run pytest -q tests/test_scheduler.py -k dst
+- uv run pytest -q
+allowed_paths:
+- tests/test_scheduler.py
+- src/pendel/scheduler.py
+protected_paths:
+- tests/fixtures/**
+- tests/conftest.py
+- src/pendel/commute.py
+- src/pendel/engine.py
+- deploy/**
+- .github/**
+- Dockerfile
+- DEPLOY.md
+- pyproject.toml
+- uv.lock
+- src/pendel/migrations/**
+merged_sha: e0800b2
+merged_at: 2026-09-30T03:46:58+0200

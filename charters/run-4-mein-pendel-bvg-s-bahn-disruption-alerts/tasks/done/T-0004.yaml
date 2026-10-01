@@ -1,0 +1,112 @@
+depends_on:
+- T-0003
+new_tests_required: true
+attempts: 1
+notes:
+- 'Pure function, no I/O: evaluate(commute, departures_json, now) -> Verdict(affected:
+  bool, kinds: list, reason_de: str, reason_en: str, disruption_key: str). disruption_key
+  is a stable id, for example kind+line+trip/remark id, so G3 can notify once per
+  disruption.'
+- 'Changed by the planner on 2026-09-29: this task no longer depends on recorded fixtures.
+  The recording task T-0015 was parked after two blocked attempts, and no tests/fixtures/hafas/departures_*.json
+  exist yet. Build and test the engine only on small hand-made inputs under tests/fixtures/hafas/engine/,
+  named synthetic_<kind>.json. T-0018 adds the recorded-fixture table later.'
+- 'Shape the synthetic inputs like HAFAS v6 /stops/:id/departures: {"departures":
+  [{"tripId", "stop": {"id", "name"}, "when", "plannedWhen" (ISO with +01:00/+02:00
+  offset), "delay" (seconds or null), "cancelled" (optional bool), "line": {"id",
+  "name", "product"}, "remarks": [{"type": "hint"|"status"|"warning", "code", "summary",
+  "text"}]}]}. Tolerate missing optional keys, because real responses omit them.'
+- Only departures inside the commute's window, on the commute's lines and at its origin
+  stop count. Remarks count only if they reference a used line or stop. When several
+  kinds apply, order them deterministically.
+- 'Implement every G1 kind: cancellation, replacement service/Ersatzverkehr, delay
+  above a threshold (a parameter, default 10 min), construction/Bauarbeiten remark,
+  and warning/Störung remark. Status remarks such as ''Additional service'' (text.realtime.journey.additional.service)
+  and hint remarks must NOT count as disruptions. Test this.'
+- 'Test with pytest.mark.parametrize over the synthetic files: one row per kind plus
+  an undisturbed row, each with the expected verdict and a reason substring in both
+  German and English.'
+- 'Include an explicit false-positive test: a disruption on a line the commute does
+  not ride returns affected=False.'
+- Never create or modify tests/fixtures/hafas/departures_*.json or tests/fixtures/hafas/README.md.
+  They belong to the recording tasks.
+- 'attempt 1: reviewer said revise: The engine is well shaped: a pure function, the
+  allowed paths only, no dependencies, a deterministic priority order, a real false-positive
+  test and a test that hint/status remarks are ignored. Five things need fixing before
+  approval.
+
+  (1) Delay threshold. The task says the threshold is ''a parameter, default 10 min''.
+  evaluate() has no threshold parameter, and the effective default is Commute.delay_threshold_min=5,
+  so a 6-minute delay currently marks a commute as affected. That goes against the
+  task. commute.py is protected, so add an explicit keyword `delay_threshold_min:
+  int = 10` to evaluate() instead, or pick one clear precedence rule and document
+  it in the docstring. Add a test showing that a delay just under the default threshold
+  returns affected=False.
+
+  (2) Boundary. The task says a delay ''above'' the threshold counts, but the code
+  uses `>=`, so a delay of exactly the threshold also counts. Choose either `>` or
+  `>=`, and add a boundary test at exactly N minutes and at N minutes minus 1 second
+  (for example 599s and 600s for a 10-minute threshold).
+
+  (3) DST. The charter requires DST transitions to be tested. Add one test where the
+  window falls on a DST-change date (for example 2026-10-25 or 2026-03-29), with a
+  departure whose plannedWhen has the other UTC offset, and show it is placed inside
+  or outside the window correctly.
+
+  (4) Duplicate test. test_hint_and_additional_service_status_do_not_count_as_disruptions
+  evaluates exactly the same input as test_undisturbed. Make it a separate fixture
+  that has a hint remark and an additional-service status remark whose text contains
+  trigger words such as ''Ersatz'' or ''Bauarbeiten''. That proves the type-gating
+  works on its own, apart from the keyword check.
+
+  (5) disruption_key for remark events is just the remark code, for example ''warning:S41:text.realtime.journey.disruption''.
+  Real HAFAS codes are generic, so different warnings, trips and days would share
+  one key and G3 would notify only once overall. Include something more specific,
+  such as the remark id when present, otherwise the trip id or a hash of the summary,
+  so separate disruptions get separate keys.
+
+  Optional: allow `line`, `stop` or `remarks` to be JSON null (`departure.get(''line'')
+  or {}`), and add a fixture with no `remarks` key at all to cover the task''s instruction
+  to tolerate missing optional keys.
+
+  Assumptions I checked and accept: matching lines by line.name, and using plannedWhen
+  for the window check. Comparing a fixed-offset datetime with a ZoneInfo datetime
+  converts both to UTC, so the pitfall described in the commute.py docstring does
+  not occur here.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 600
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0004
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Deterministic disruption engine: verdict + German/English reason, table-driven
+  over recorded fixtures'
+why: 'This is the core of G1. It decides deterministically whether a commute is affected:
+  cancellation, Ersatzverkehr, delay above the threshold, or a construction remark
+  on a line or stop the commute uses. It returns a short German and English reason.
+  The engine must ignore disruptions on lines the user does not ride.'
+acceptance:
+- uv run pytest -q tests/test_engine.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine.py
+- tests/fixtures/hafas/engine/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/commute.py
+- src/pendel/hafas/**
+- tests/fixtures/hafas/departures_*.json
+- tests/fixtures/hafas/README.md
+- scripts/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 8caa2a5
+merged_at: 2026-09-29T10:18:05+0200

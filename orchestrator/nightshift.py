@@ -446,6 +446,7 @@ class AgentResult:
         self.stderr: str = ""
         self.timed_out: bool = False
         self.rate_limit_info: dict = {}
+        self.max_turns: int = 0
 
     @property
     def is_error(self) -> bool:
@@ -462,6 +463,31 @@ class AgentResult:
     @property
     def cost_usd(self) -> float:
         return float(self.result.get("total_cost_usd", 0.0) or 0.0)
+
+    @property
+    def interrupted(self) -> bool:
+        """The agent never got to work: killed from outside, or never started.
+
+        The weekly backup stops every container at Thursday 03:00 UTC; it SIGTERM'd
+        run 5's T-0039 thirteen seconds in (exit 143, no result event, 0 turns) and
+        the loop charged that as a failed attempt and parked the task. No result
+        and no turns says nothing about the task, so it must not count against it.
+        """
+        return (not self.result and self.num_turns == 0 and self.exit_code != 0
+                and not self.timed_out and not self.rate_limited)
+
+    @property
+    def hit_max_turns(self) -> bool:
+        return (self.result.get("subtype") == "error_max_turns"
+                or (self.max_turns > 0 and self.num_turns > self.max_turns))
+
+    def stop_reason(self) -> str | None:
+        """Why the agent stopped before it could report, when the loop knows."""
+        if self.hit_max_turns:
+            return f"turn limit reached ({self.num_turns} turns, limit {self.max_turns})"
+        if self.timed_out:
+            return "timed out"
+        return None
 
     @property
     def permission_denials(self) -> list:
@@ -529,7 +555,9 @@ class AgentResult:
                 f"error={self.is_error} turns={self.num_turns} "
                 f"cost=${self.cost_usd:.4f}"
                 + (" RATE-LIMITED" if self.rate_limited else "")
-                + (" TIMEOUT" if self.timed_out else ""))
+                + (" TIMEOUT" if self.timed_out else "")
+                + (" MAX-TURNS" if self.hit_max_turns else "")
+                + (" INTERRUPTED" if self.interrupted else ""))
 
 
 def read_token() -> str:
@@ -651,6 +679,7 @@ def run_agent(role: str, task_id: str, prompt: str, *, model: str,
 
     # GNU timeout reports 124; the wrapper is the outer bound on a stuck agent.
     out.timed_out = out.exit_code == 124
+    out.max_turns = max_turns
     record_usage(out, time.time() - started, model)
     log(out.summary())
     return out
@@ -1444,7 +1473,7 @@ def save_gate_run(task: dict, gate: gates.GateResult) -> Path:
 
 # ----------------------------------------------------------------- one task
 def work_one_task(task: dict, state: dict, gov: Governor) -> str:
-    """Returns 'merged', 'retry', 'parked', 'limited' or 'error'."""
+    """Returns 'merged', 'retry', 'parked', 'limited', 'interrupted' or 'error'."""
     tid = task["id"]
     state["current_task"] = tid
     state_save(state)
@@ -1459,12 +1488,21 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
     if res.rate_limited:
         gov.on_limit(state, res)
         return "limited"
+    if res.interrupted:
+        # Not an attempt: the task stays ready with its attempt count unchanged.
+        # Backing off through the governor gives a stopping host time to finish
+        # stopping, and pauses the run if the agent keeps failing to start.
+        log(f"{tid} worker was interrupted before it did anything "
+            f"(exit {res.exit_code}); not counted as an attempt", level="WARN")
+        gov.on_error(state)
+        return "interrupted"
 
     worker_json = extract_json_object(res.text) or {}
     gate = gates.run_gates(
         task, work, INTEGRATION, worker_json,
         lambda tid_, work_, cmd_, timeout_min: sandbox_exec(
-            tid_, work_, cmd_, timeout_min, project=task["project"]))
+            tid_, work_, cmd_, timeout_min, project=task["project"]),
+        worker_stopped=res.stop_reason())
     gate_log = save_gate_run(task, gate)
     log(f"{tid} {gate.report()}")
     if not gate.ok:
@@ -1512,8 +1550,10 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         else "reviewer produced no usable JSON")
     task = dict(task)
     task["attempts"] = task.get("attempts", 0) + 1
+    # Reviewer verdicts run 2-3k characters and list numbered fixes; a note cut at
+    # 600 handed the retry only the first fix and parked the task over the rest.
     task.setdefault("notes", []).append(
-        f"attempt {task['attempts']}: {clip(reason, 4000)}")
+        f"attempt {task['attempts']}: {clip(reason, 8000)}")
     output = gate.failing_output()
     if output:
         task["notes"].append(

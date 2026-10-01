@@ -1,0 +1,12 @@
+# No new work: all goals meet their definition of done, per the human's 20260930-073500 decision
+
+_Recorded 20260930-073449 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty and there are no worker followups. The human's ADR 20260930-073500 records commits 7fece10 and ff851eb on the integration branch, which I confirmed in /repo/mein-pendel. They add six real recorded departures fixtures under tests/fixtures/hafas/recorded/ (undisturbed, cancellation, delay, replacement_service, construction, warning), with a provenance README and scripts/record_fixtures.py. They also add tests/test_engine_recorded.py: a table-driven test over all six fixtures, two false-positive cases (tram 12 at Friedrichstr. against S-Bahn riders, and S46 at Westkreuz against S41/S42 riders) and an HTML-entity check. That meets G1's definition of done. The same ADR says T-0002, T-0015, T-0016, T-0017, T-0018, T-0020, T-0021 and T-0022 are superseded and must not be revived. It also says deploy/verify.sh passed on the host, that every goal's definition of done is met, and: 'Do not add more idle polish; let the run finish.' G2 to G5 already had their definition-of-done tests from done tasks T-0023 to T-0050.
+
+## Decision
+This run emits no ops. No tasks are added or revived, and the superseded recording-chain tasks stay parked as they are. Assumptions, taking the most conservative reading: (1) the charter allows idle work but does not require it, and the human explicitly asked for none, so an empty backlog is correct and stays within the charter; (2) no op exists to mark roadmap milestones as done, so M1 to M5 keep their 'planned' labels in ROADMAP.md, and this ADR records that each goal's definition of done is met; (3) the other parked tasks (T-0001, T-0007, T-0009, T-0011, T-0013, T-0029, T-0032, T-0034, T-0039, T-0040) were already retried and completed under later IDs, so they need no action; (4) the planner made no live HAFAS calls and did not run the test suite, because the repo is mounted read-only.
+
+## Consequences
+The backlog stays empty and the run can finish. Human follow-ups that no agent may do: fill in the Impressum and Datenschutzerklärung placeholders with Tim's details; push the repo to a GitHub remote so CI runs and publishes ghcr.io/tpatzelt/mein-pendel; then make the GHCR package reachable for deployment. If a later planner run finds new followups or a failing test, only work that the charter's idle list allows may be scheduled, and only if the human lifts the 'no more idle polish' instruction.

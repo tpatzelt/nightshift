@@ -1,0 +1,151 @@
+depends_on:
+- T-0005
+- T-0008
+- T-0019
+new_tests_required: true
+attempts: 2
+notes:
+- 'tick(now) checks each active commute whose window starts within a lead time (env
+  PENDEL_CHECK_LEAD_MIN, default 30) or is open now. It fetches departures through
+  pendel.hafas.HafasClient: one request per origin stop per tick, shared across commutes
+  through the client cache. Then it runs pendel.engine.evaluate and pendel.alternatives.suggest_alternative,
+  and calls the tracker.'
+- Clock, HafasClient (built on the conftest hafas_replay MockTransport) and channels
+  (FakeChannel) are injected. No live calls, and no request to any messaging service.
+- 'No recorded real fixtures exist, because live recording is blocked in this sandbox.
+  Drive the simulated morning with labelled synthetic departures files under tests/fixtures/hafas/scheduler/synthetic_*.json,
+  shaped like tests/fixtures/hafas/engine/synthetic_*.json. Example timeline: 06:30
+  undisturbed, 06:45 Ersatzverkehr, 07:00 same, 07:15 cleared. Switch the replay per
+  simulated time. Do not edit files under tests/fixtures/hafas/engine/ or harness/.'
+- Assert exactly one notification per disruption per commute, none for a commute on
+  an unaffected line, and one resolved message when the disruption clears.
+- Provide a run_forever entry point, but do not start it in tests.
+- 'attempt 1: reviewer said revise: The scheduler fits G3/M3. The tests are real:
+  they fail without the new module. They check one activation and one resolved message
+  for S41, nothing for U5, and the lead-window boundary. Four things need fixing before
+  this can be approved:
+
+
+  1. The task notes explicitly say to run pendel.alternatives.suggest_alternative.
+  It is not called, and G1 requires a suggested alternative connection. The worker''s
+  reason is that tracker.process has no parameter for it. That may be true, but it
+  is a deviation from the task, not a call the worker can make alone. Either wire
+  it in for affected verdicts (fetch journeys through the cached HafasClient only
+  when verdict.affected, and pass the result wherever the notification text is built
+  within the allowed paths), or report the task as blocked on a tracker API change.
+  Silently dropping it is not acceptable.
+
+
+  2. The task requires one request per origin stop per tick, and the code does not
+  guarantee it. The departures() duration comes from each commute''s own window_end,
+  so two commutes at the same stop with different windows produce different cache
+  keys and two HTTP requests. The test only passes because both commutes have identical
+  windows. Group the due commutes by origin_stop_id, make one departures() call per
+  stop with a duration that covers the latest window_end, and add a test with two
+  same-stop commutes that have different windows, asserting a single request.
+
+
+  3. Operational robustness: HafasClient raises HafasError once its 429/503 retries
+  run out. Today that exception aborts the rest of the tick for every other commute
+  and kills run_forever permanently. Catch it per stop (log and skip), and don''t
+  let one failed tick end the loop. Add a test in which one stop''s replay returns
+  503 or 429 and the other stop''s commutes are still processed.
+
+
+  4. Minor: the notes ask for the conftest hafas_replay MockTransport with the replay
+  switched per simulated time. The test instead uses its own handler that returns
+  fixtures by call order. Prefer hafas_replay, or at least select the fixture by the
+  request''s `when` parameter, so the test proves the fixture really matches each
+  tick''s time. Also, _lead_minutes crashes the tick on a non-integer PENDEL_CHECK_LEAD_MIN;
+  validate it once in __init__.
+
+
+  No secrets, no new dependencies, nothing touches the network or messaging services,
+  and run_forever is never started in tests. Accessing the users table directly via
+  SQL is acceptable given db.py''s current API.'
+- 'attempt 2: reviewer said revise: Most of the attempt-1 feedback is fixed, and the
+  fixes are tested. (1) suggest_alternative is called for affected verdicts and its
+  text is added to reason_de/reason_en. This is acceptable because tracker.process
+  only reads those two fields and deduplicates on disruption_key, so adding the alternative
+  text does not cause resends. A test checks that the U2 alternative appears in the
+  message. (2) Due commutes are grouped by origin stop, and departures() is called
+  once per stop with a duration long enough for the latest window_end. The test uses
+  two windows at the same stop and checks for a single request with duration=45. (3)
+  A HafasError is now caught per stop, and a 503 test shows the other stop is still
+  processed. (4) The replay handler picks the fixture from the request''s Berlin-ISO
+  `when` param, and an invalid PENDEL_CHECK_LEAD_MIN now fails at construction. There
+  are no secrets, no new dependencies and no network or messaging calls, and run_forever
+  is never started in tests.
+
+
+  One item from attempt 1 is still not done: "don''t let one failed tick end the loop".
+  run_forever calls self.tick(clock()) without any try/except. Only HafasError is
+  caught, and only inside _process_stop. Any other exception still escapes: a channel
+  send failure raised through tracker.process, a sqlite error, a malformed commute
+  row (ValueError in _all_commutes), or an unexpected engine error. That exception
+  aborts the rest of the tick and ends run_forever for good. The daemon would silently
+  stop notifying everyone.
+
+
+  Fixes needed:
+
+  (a) In run_forever, wrap each tick in `try: ... except Exception: logger.exception(...)`
+  and always call sleep.
+
+  (b) In tick, isolate each commute. Catch and log exceptions around _process_commute,
+  so one commute''s channel or tracker failure does not skip the other commutes in
+  the group.
+
+  (c) Add tests. First, a bounded run_forever test: inject a clock and a sleep that
+  raises a sentinel exception after N calls, and make the first tick raise. Assert
+  that the loop keeps going (sleep is called again and the next tick runs); the test
+  must not loop for real. Second, a test where one commute''s channel .send raises
+  and another commute''s notification is still sent.
+
+
+  Optional, for rate-limit hygiene: while a commute stays affected, _with_alternative
+  issues a new, uncached journeys() request on every tick (the cache key includes
+  `now`), even though tracker.process will not send anything once the key is already
+  active. Consider looking up the alternative only when verdict.disruption_key is
+  not already active in the notifications table for that commute. A read-only SELECT
+  is fine, in line with the existing direct-SQL allowance.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 500
+timeout_min: 60
+max_turns: 80
+status: parked
+id: T-0009
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Scheduler with injected clock; test drives a simulated morning across fixtures
+why: 'This covers the G3 definition of done: a test drives the scheduler across a
+  simulated morning and asserts exactly one notification per disruption per commute,
+  none when unaffected, and a resolved message when a disruption clears. The scheduler
+  must also respect the HAFAS rate limit.'
+acceptance:
+- uv run pytest -q tests/test_scheduler.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/scheduler.py
+- tests/test_scheduler.py
+- tests/fixtures/hafas/scheduler/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/notify/**
+- pyproject.toml
+- uv.lock
+rank: 3
+park_reason: 'reviewer said revise: Most of the attempt-1 feedback is fixed, and the
+  fixes are tested. (1) suggest_alternative is called for affected verdicts and its
+  text is added to reason_de/reason_en. This is acceptable because tracker.process
+  only reads those two fields and deduplicates on disruption_key, so adding the alternative
+  text does not cause resends. A test checks that the U2 alternative appears in the
+  message. (2) Due commutes are grouped by origin stop, and departures() is called
+  once per stop with a duration long enough for the latest window_end. The test uses
+  two windows at the same stop a'

@@ -1,0 +1,64 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- This replaces parked T-0016 and has the same scope. The only change is that tests/test_web_commutes.py
+  is now allowed.
+- If window_end < window_start, the window ends on the next calendar day. Weekdays
+  refer to the day the window starts. window_end == window_start is still allowed
+  and stays a single-instant window today.
+- window_bounds(date) returns end on date+1 for a crossing window, normalised the
+  same way as today. Add window_containing(now) -> (start, end) | None. It checks
+  the window starting today and the one that started yesterday (only if yesterday
+  was an active weekday). Compare as UTC instants, as next_window_start does.
+- 'DST tests: 2026-10-24 (Sat) 23:30-02:30 across the 2026-10-25 fall-back is 4 real
+  hours. 2027-03-27 (Sat) 23:30-02:30 across the 2027-03-28 spring-forward ends at
+  03:30+02:00. Test window_containing at 00:15 the next day, and at 02:30 in both
+  folds of the fall-back night.'
+- In tests/test_commute.py, replace test_rejects_window_end_before_window_start with
+  a crossing-window test.
+- tests/test_web_a11y.py::test_commutes_new_invalid_window_has_role_alert and tests/test_web_commutes.py::test_post_with_window_end_before_window_start_returns_400_and_inserts_no_row
+  both post 08:00-07:30, which is now valid. Change their invalid input to a malformed
+  time such as '25:00'. Keep asserting 400, role=alert / <form>, and zero rows. Rename
+  the test_web_commutes test to match.
+- Do not change engine, scheduler or app here (T-0017 to T-0019). Leave _default_window's
+  23:59 clamp and its test alone (T-0019).
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0031
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Commute: allow departure windows that cross midnight, DST-safe (re-issue of
+  parked T-0016)'
+why: 'G2: departure windows may cross midnight (e.g. 23:30-00:30), including across
+  DST transitions. Commute.__post_init__ still rejects window_end < window_start.
+  T-0016 was parked because tests/test_web_commutes.py::test_post_with_window_end_before_window_start_returns_400_and_inserts_no_row
+  asserts the old rejection, and that file was outside its allowed_paths.'
+acceptance:
+- uv run pytest -q tests/test_commute.py tests/test_web_a11y.py tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/commute.py
+- tests/test_commute.py
+- tests/test_web_a11y.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: 01cc3a5
+merged_at: 2026-09-30T17:19:00+0200

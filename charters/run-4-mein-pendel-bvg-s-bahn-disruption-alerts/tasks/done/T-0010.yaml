@@ -1,0 +1,53 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Add dependencies jinja2 and uvicorn via `uv add`, and justify them in the commit
+  message (the charter prefers jinja2 and needs uvicorn for `uv run uvicorn`). Do
+  not add other dependencies.
+- 'base.html: <meta name="viewport" content="width=device-width, initial-scale=1">,
+  lang attribute, a footer block (legal links come later under G5), small inline or
+  static CSS with no fixed px widths above 360, and no JS bundler.'
+- Language comes from a ?lang=de|en query/cookie and falls back to Accept-Language,
+  default de. Keep the strings in a simple dict in i18n.py.
+- GET /healthz returns 200 {"status":"ok"}. GET / renders the base page.
+- tests/test_app.py uses TestClient. It asserts the viewport meta and that no HTML/CSS
+  contains width:NNNpx with NNN > 360 (a regex over the response and static CSS).
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0010
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: FastAPI app skeleton with Jinja2 base template (viewport meta, DE/EN), /healthz
+  and 360px HTML-structure test
+why: G2 requires `uv run uvicorn pendel.app:app` serving server-rendered, mobile-first
+  HTML with no JS build step, in German and English. G4's healthcheck needs an endpoint.
+  Later G2 routes and G3's Telegram linking attach to this app.
+acceptance:
+- uv sync
+- uv run pytest -q tests/test_app.py
+- uv run pytest -q
+- uv run python -c "from pendel.app import app"
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/**
+- src/pendel/static/**
+- tests/test_app.py
+- pyproject.toml
+- uv.lock
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- src/pendel/db.py
+- src/pendel/migrations/**
+rank: 6
+merged_sha: 65ba6f6
+merged_at: 2026-09-29T13:04:49+0200

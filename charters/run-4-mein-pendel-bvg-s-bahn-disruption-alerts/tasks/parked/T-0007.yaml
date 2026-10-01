@@ -1,0 +1,76 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- 'HARD RULE: never send any request to api.telegram.org or any ntfy server, not even
+  to test. Do not create a bot token. Adapters get an injected httpx client. Tests
+  use httpx.MockTransport or the fake channel only, and assert the request URL/body
+  that would be built.'
+- 'Define a Channel Protocol: send(target: str, text: str) -> None. Add TelegramChannel
+  (token from env PENDEL_TELEGRAM_BOT_TOKEN, sendMessage), NtfyChannel (server from
+  env PENDEL_NTFY_URL, topic as target) and FakeChannel (records sent messages in
+  a list).'
+- If a required env var is missing, the real adapters raise a clear configuration
+  error. They never fall back to a default public server.
+- "attempt 1: gate failures:\n  - diff appears to contain a hard-coded credential"
+- 'attempt 2: reviewer said revise: The work matches T-0007/G3. All 6 changed files
+  are inside allowed_paths and nothing protected was touched. There are no new dependencies
+  and no default public server. The env var errors, injected httpx.Client and MockTransport-only
+  tests are all correct, and the tests check the exact request URL and body, so they
+  would fail if the change were reverted. I confirmed that tests/conftest.py has the
+  autouse socket guard. Two things need fixing before approval. (1) Security, needs
+  a fix: TelegramChannel.send puts the bot token in the URL path and then calls response.raise_for_status().
+  The httpx.HTTPStatusError this raises includes the full request URL in its message,
+  so any 4xx/5xx from Telegram (for example 403 when a user blocked the bot, or 429)
+  puts PENDEL_TELEGRAM_BOT_TOKEN into whatever logs the future scheduler writes. httpx.RequestError
+  and transport exceptions can carry the URL the same way. Fix: catch httpx.HTTPError
+  in send and re-raise your own exception (for example a new ChannelSendError) whose
+  message has the status code or error type but not the URL or token, using `from
+  None` so the original exception is not chained. Add a MockTransport test that returns
+  403 and asserts the token does not appear in str(exc) or repr(exc). Adding the same
+  error handling to NtfyChannel would keep the two adapters consistent; it is optional.
+  (2) NtfyChannel builds f"{server}/{target}" without quoting the target. A topic
+  containing ''/'', ''?'' or ''#'' would change the request path or query. Either
+  percent-encode the target with urllib.parse.quote(target, safe='''') or reject topics
+  that are not in ntfy''s allowed charset ([A-Za-z0-9_-]{1,64}) by raising ValueError,
+  and add a test for it. Minor, no action needed: test_telegram_channel_never_falls_back_to_a_default_token
+  repeats test_telegram_channel_raises_without_token, because passing bot_token=None
+  is the same as the default; you could drop it or have it assert something different.
+  Assumptions recorded: a synchronous send() matches the task note; the linking flow
+  and scheduler are correctly left as follow-ups.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0007
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Notification channel interface with Telegram and ntfy adapters and in-memory
+  fakes
+why: G3 requires a channel layer that is an interface with fakes in tests, for Telegram
+  and ntfy. The charter forbids ever contacting Telegram or any ntfy server during
+  the run.
+acceptance:
+- uv run pytest -q tests/test_notify.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/notify/**
+- tests/test_notify.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: 'reviewer said revise: The work matches T-0007/G3. All 6 changed files
+  are inside allowed_paths and nothing protected was touched. There are no new dependencies
+  and no default public server. The env var errors, injected httpx.Client and MockTransport-only
+  tests are all correct, and the tests check the exact request URL and body, so they
+  would fail if the change were reverted. I confirmed that tests/conftest.py has the
+  autouse socket guard. Two things need fixing before approval. (1) Security, needs
+  a fix: TelegramChannel.send puts the bot token in the URL path and then calls response.raise_for_'

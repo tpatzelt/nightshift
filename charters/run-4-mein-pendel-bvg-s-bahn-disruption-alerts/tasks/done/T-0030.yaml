@@ -1,0 +1,69 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Add GET /notifications to show the cookie user's linked channels (kind + masked
+  target, no raw tokens), POST /notifications/telegram to call telegram_link.create_link
+  and render the t.me deep link as a plain <a href> (no JS), and POST /notifications/ntfy
+  to save a topic as a channels row with kind='ntfy', target=<topic> and linked_at
+  set. Parse the form the way POST /commutes does (urllib.parse.parse_qs, because
+  python-multipart is not a dependency).
+- 'Validate the ntfy topic with ^[A-Za-z0-9_-]{1,64}$. If it is invalid, return 400
+  with a DE/EN error and insert no row. If there is no uid cookie or the user is unknown,
+  show a hint to save a commute first and create no rows (conservative assumption:
+  channels only belong to users who already exist).'
+- If PENDEL_TELEGRAM_BOT_USERNAME is unset, catch TelegramLinkConfigError and show
+  a friendly DE/EN message with status 503. Never show a traceback.
+- Put any new SQL helper (for example add_ntfy_channel, list_channels) in db.py. Do
+  not add a migration; the channels table already has the needed columns.
+- 'Never contact Telegram or ntfy: these routes only write rows. Add a link to /notifications
+  from index.html.'
+- 'Tests use TestClient with PENDEL_DATA_DIR set to tmp_path and monkeypatch for the
+  env. Cover: the deep link is shown when the env is set and a channels row with a
+  link_token exists; 503 when the env is unset; a valid ntfy topic inserts exactly
+  one row; an invalid topic gives 400 with no row; no cookie creates no rows; delete-my-data
+  (POST /me/delete) also removes these channel rows; the page has viewport meta and
+  no fixed width above 360px (reuse the pattern from tests/test_web_today.py).'
+- "attempt 1: gate failures:\n  - diff is 490 lines, limit is 400"
+created: 2026-09-29T18:26:41+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0030
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Notification settings page: get a Telegram /start deep link and save an ntfy
+  topic for the cookie user'
+why: 'G3 notifies via Telegram (linked via /start deep-link token) and ntfy topic,
+  but no route lets a visitor create a link or enter a topic: telegram_link.create_link
+  is never called from app.py and nothing inserts an ntfy channel row, so tracker._recipients
+  finds no recipients for any real user.'
+acceptance:
+- uv run pytest -q tests/test_web_notifications.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/db.py
+- src/pendel/i18n.py
+- src/pendel/templates/notifications.html
+- src/pendel/templates/index.html
+- tests/test_web_notifications.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/scheduler.py
+- src/pendel/telegram_link.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 7403c62
+merged_at: 2026-09-29T22:46:26+0200

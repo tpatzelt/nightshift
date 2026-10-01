@@ -1,0 +1,69 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Only base.html changes on the source side. Templates are rendered with templates.TemplateResponse(request,
+  ...), so `request` is available in base.html.
+- 'Compute the switch target in base.html: use request.url.path only when request.method
+  == ''GET'' and the path starts with ''/'' but NOT with ''//'' (so a protocol-relative
+  link to another host can never be produced); otherwise fall back to ''/''. POST
+  responses that re-render a form (e.g. POST /commutes answering 400) must link to
+  ''/?lang=..'', because there is no GET /commutes.'
+- Drop the existing query string and append only ?lang=en or ?lang=de. Keeping other
+  query parameters is out of scope; do not add a helper to app.py (it is protected).
+- Keep the existing hreflang and lang attributes and the existing footer_language_switch
+  label. Change nothing else in the footer.
+- 'Update tests/test_web_language.py: the existing assertions that expect href="/?lang=en"
+  on /impressum, /about and /stops must now expect the page''s own path, e.g. href="/about?lang=en";
+  ''/'' still expects href="/?lang=en". Add tests: (a) GET /about?lang=en contains
+  href="/about?lang=de"; (b) GET /today (no user) links to /today?lang=en; (c) an
+  invalid POST /commutes (window_end before window_start, see tests/test_web_commutes.py)
+  returns 400 and its switch link is href="/?lang=en"; (d) following the switch link
+  on /about sets the lang cookie and renders <html lang="en">.'
+- 'Use TestClient(app) without ''with'', as the other web tests do, with PENDEL_DATA_DIR
+  set to tmp_path via monkeypatch. Fully offline: no fixture or conftest changes.'
+created: 2026-09-30T07:03:27+0200
+max_diff_lines: 150
+timeout_min: 35
+max_turns: 45
+status: done
+id: T-0050
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: Footer DE/EN language switch keeps the visitor on the current GET page instead
+  of always jumping to '/'
+why: 'G2 requires a German and English UI. The footer switch in src/pendel/templates/base.html
+  always links to ''/?lang=en'' or ''/?lang=de'', so a visitor who switches language
+  on /today, /stops, /notifications, /impressum, /datenschutz or /about is sent back
+  to the home page. Every one of those GET routes in app.py already reads ?lang= and
+  sets the lang cookie, so the fix is template-only: link to the current path with
+  ?lang=. This is a small accessibility/usability fix strictly within G2, so it counts
+  as allowed idle work and adds nothing new.'
+acceptance:
+- uv run pytest -q tests/test_web_language.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/templates/base.html
+- tests/test_web_language.py
+protected_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/db.py
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- src/pendel/notify/**
+- src/pendel/static/**
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- Dockerfile
+- .github/**
+- pyproject.toml
+- uv.lock
+- README.md
+- DEPLOY.md
+merged_sha: 5082a32
+merged_at: 2026-09-30T07:05:19+0200

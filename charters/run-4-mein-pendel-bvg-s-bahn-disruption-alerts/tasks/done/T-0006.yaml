@@ -1,0 +1,50 @@
+depends_on:
+- T-0003
+new_tests_required: true
+attempts: 0
+notes:
+- Use stdlib sqlite3 only. The migration runner applies src/pendel/migrations/NNNN_*.sql
+  in order and records the applied ones in a schema_migrations table.
+- 'Tables (minimum): users (opaque random id, created_at; NO email or name), commutes
+  (FK users ON DELETE CASCADE, fields matching pendel.commute.Commute), channels (FK
+  users, kind ''telegram''|''ntfy'', target, link_token, linked_at), notifications
+  (commute_id, disruption_key, state ''active''|''resolved'', first_notified_at, resolved_at;
+  UNIQUE(commute_id, disruption_key)).'
+- Enable PRAGMA foreign_keys=ON on every connection. Add a delete_user(user_id) helper
+  and a test proving no rows remain for that user in any table.
+- The DB file path is Path(os.environ['PENDEL_DATA_DIR'])/'pendel.db'. Tests use tmp_path
+  via monkeypatch.
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0006
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: SQLite storage at PENDEL_DATA_DIR with plain-SQL migrations for commutes and
+  notification state
+why: The G3 scheduler needs persisted commutes, notification channels and per-disruption
+  notification state. The charter requires SQLite at a path from PENDEL_DATA_DIR,
+  with schema migrations as plain SQL files. The G5 privacy rules mean no email or
+  name columns.
+acceptance:
+- uv run pytest -q tests/test_db.py
+- uv run pytest -q
+- ls src/pendel/migrations/0001_initial.sql
+allowed_paths:
+- src/pendel/db.py
+- src/pendel/migrations/**
+- tests/test_db.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: ced672f
+merged_at: 2026-09-29T13:16:08+0200

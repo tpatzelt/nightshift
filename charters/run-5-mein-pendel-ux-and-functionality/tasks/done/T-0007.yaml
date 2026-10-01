@@ -1,0 +1,94 @@
+depends_on:
+- T-0002
+new_tests_required: true
+attempts: 1
+notes:
+- 'Create 0003_commute_paused.sql: ALTER TABLE commutes ADD COLUMN paused INTEGER
+  NOT NULL DEFAULT 0. Never edit 0001 or 0002.'
+- 'Add db helpers, all scoped by user_id so one visitor can never touch another''s
+  commute: get_commute(conn, user_id, commute_id), update_commute(conn, user_id, commute_id,
+  commute), set_paused(conn, user_id, commute_id, paused) and delete_commute(conn,
+  user_id, commute_id), which returns whether a row was deleted. list_commutes must
+  expose the paused flag, e.g. through a `paused: bool = False` field on Commute;
+  keep existing callers working.'
+- 'The scheduler must skip paused rows, in _all_commute_rows or _due_commute. Test:
+  with one paused and one active commute due at the same time, only the active one
+  is fetched and notified.'
+- 'Migration test: create a DB with only 0001 and 0002, holding a user, a commute
+  and a channel. db.connect() must upgrade it without data loss, and paused defaults
+  to 0.'
+- Test that delete_commute removes exactly one commute and leaves the user's other
+  commutes and other users' commutes.
+- 'attempt 1: reviewer said revise: The production code is correct and stays in scope.
+  Migration 0003 is additive and 0001/0002 are untouched. Every helper filters on
+  id AND user_id and returns rowcount > 0. update_commute serialises fields the same
+  way add_commute does. _all_commute_rows filters WHERE paused = 0, and it is the
+  scheduler''s only commute query. Two tests fall short of what the task notes ask
+  for:
+
+
+  1. The migration test must use a database holding a user, a commute and a channel.
+  test_migration_0003_upgrades_existing_database_without_data_loss creates no channel
+  and never checks that the user or channel survive; it only checks origin_stop_id
+  and paused. Fix: call _insert_channel(old_conn, user_id) before closing. After db.connect(),
+  assert the user row, the channel row (kind/target) and the commute''s full fields
+  (destination, lines, weekdays, window, names) are unchanged, and that paused ==
+  0.
+
+
+  2. The task asks to show that only the active commute is fetched. In test_paused_commute_is_skipped_while_active_commute_due_at_the_same_time_is_fetched
+  both commutes use origin_stop_id=''900000100001''. The scheduler merges commutes
+  at the same stop into one request (see test_two_commutes_same_stop_different_windows_cause_a_single_departures_request),
+  so `assert len(calls) == 1` still passes with the paused filter reverted. Only the
+  notification-count assertion actually tests the change. Fix: give the paused commute
+  a different origin (e.g. ''900000900009'') and assert that stop is never requested,
+  e.g. that no call''s path contains the paused stop ID and exactly one departures
+  call is made for the active stop.
+
+
+  Minor, optional: in test_update_commute_overwrites_fields_and_is_scoped_to_owner,
+  check right after the other user''s rejected update that the owner''s row is still
+  the original. Also assert that weekdays, window and paused round-trip.
+
+
+  Assumptions accepted: add_commute storing paused, and update_commute overwriting
+  every field, are both reasonable and consistent.'
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0007
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Migration 0003: paused flag, per-user commute CRUD helpers, scheduler skips
+  paused'
+why: 'G2: commutes can be paused, resumed, edited and deleted individually, and the
+  scheduler never checks paused commutes. The schema has no paused flag, and db.py
+  has no per-commute get, update or delete.'
+acceptance:
+- test -f src/pendel/migrations/0003_commute_paused.sql
+- uv run pytest -q tests/test_db.py tests/test_scheduler.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/migrations/0003_commute_paused.sql
+- src/pendel/db.py
+- src/pendel/commute.py
+- src/pendel/scheduler.py
+- tests/test_db.py
+- tests/test_scheduler.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+merged_sha: 98ae2c9
+merged_at: 2026-09-30T14:01:51+0200

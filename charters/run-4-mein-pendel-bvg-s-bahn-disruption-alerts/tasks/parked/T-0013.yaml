@@ -1,0 +1,133 @@
+depends_on:
+- T-0012
+new_tests_required: true
+attempts: 2
+notes:
+- Use httpx only. Add no dependencies. Make no live HTTP calls. Tests use the hafas_replay
+  fixture from tests/conftest.py, or their own httpx.MockTransport.
+- 'API: locations(query), departures(stop_id, when, duration), journeys(from_id, to_id,
+  departure), trip(trip_id). Base URL comes from env PENDEL_HAFAS_BASE_URL, default
+  https://v6.bvg.transport.rest. The httpx client is injected.'
+- The cache key is path plus sorted params. TTL uses an injected monotonic clock callable,
+  so tests never sleep.
+- 'The cache must be bounded. Evict expired entries on insert and cap it at max_entries
+  (default 256), dropping the oldest first. Test: 1000 departures calls with distinct
+  `when` leave len(cache) <= max_entries.'
+- 'Test: after the TTL passes, the entry is refetched and the stale entry is gone.'
+- Backoff on 429/503 uses an injected sleep with delays 0.5, 1 and 2 s and at most
+  3 retries. Honour a numeric Retry-After, capped at 10 s. After the last retry, raise
+  HafasError. Other 4xx/5xx raise HafasError at once with no retry.
+- If anything blocks you, report the exact command and its error output in your final
+  report.
+- 'attempt 1: reviewer said revise: The implementation is sound and stays within allowed_paths.
+  It adds no dependencies, and the cache and backoff logic match the task notes: the
+  key is path plus sorted params, expired entries are purged on insert, the cache
+  is capped FIFO at max_entries, retries use 0.5/1/2 s, Retry-After is capped at 10
+  s, and other 4xx/5xx raise at once. The required cache-bound, TTL-refetch, stale-eviction
+  and exhausted-retry tests are present, and they would fail if the change were reverted.
+  There are still test gaps that should be closed before approval:
+
+  (1) The tests never check the query parameters sent to HAFAS. The conftest `hafas_replay`
+  routes by `request.url.path` only. So a regression that renamed or dropped `from`/`to`
+  on /journeys, `when`/`duration` on departures, or `query` on /locations would still
+  pass. Add at least one MockTransport test per endpoint that asserts `request.url.params`
+  (for example `from=900100003&to=900100017&departure=...`, and `when`/`duration`
+  on departures).
+
+  (2) The only Retry-After test uses 20 s, which gets capped to 10. An implementation
+  that always returns 10 whenever the header is present would still pass. Add a test
+  where Retry-After is below the cap (e.g. ''3'' → sleep 3.0), preferably on a 429.
+  Also add one where the header is not numeric (an HTTP-date) and the client falls
+  back to the fixed 0.5 s delay.
+
+  (3) Add a test that the cache key ignores param order, or at least that identical
+  calls through different methods or paths do not collide. This is optional but cheap.
+
+  Non-blocking observations to record as follow-ups rather than fix here:
+
+  - Naive datetimes are sent without an offset via isoformat(). The charter says Europe/Berlin
+  throughout, so a later task should require or convert to aware Europe/Berlin datetimes.
+
+  - Transport errors (httpx.TransportError) and bad JSON are not wrapped in HafasError.
+
+  - Cached values are mutable objects shared with callers.
+
+  - The fixtures are hand-written rather than recorded. That is acceptable, because
+  this task forbids live calls, but they must not later be cited as real recordings
+  for the G1 definition of done.'
+- 'attempt 2: reviewer said revise: Most of the work is right, but one required test
+  does not check what the task asks for. The diff only touches allowed_paths, adds
+  no dependency, makes no live calls, and serves G1/M1. The client matches the task
+  notes: the cache key is path plus sorted params, expired entries are purged on insert,
+  the cache is capped FIFO at max_entries=256, retries sleep 0.5/1/2 s with at most
+  3 retries, and a numeric Retry-After is honoured up to 10 s. Other 4xx/5xx raise
+  HafasError at once. The attempt-1 gaps are closed: every endpoint has a query-param
+  test, Retry-After is tested at 3 → 3.0, at 20 → 10.0 and as an HTTP-date falling
+  back to 0.5, and cache-key order independence is tested. All gates are green.
+
+
+  BLOCKING: (1) test_stale_entry_is_purged_and_refetched_after_ttl does not test that
+  the same entry is refetched. The second call uses a different `when` (09:00 instead
+  of 08:00), which is a different cache key. So `len(requests) == 2` holds whether
+  or not the TTL works, and the test would still pass if the TTL check were broken
+  for lookups. The task note says: ''after the TTL passes, the entry is refetched
+  and the stale entry is gone''. Rewrite it to: call departures(A), then call A again
+  before the TTL (e.g. advance 9 s) and assert 1 request. Advance past the TTL, call
+  the same A, and assert 2 requests with len(cache)==1. Optionally add a separate
+  case for the current check that an expired entry with a different key is purged
+  on insert (not just shadowed).
+
+
+  NON-BLOCKING hardening (fix here if cheap, otherwise record as follow-ups): (a)
+  _retry_delay passes through negative or NaN Retry-After values such as ''-5'' or
+  ''nan''. min() does not guard the lower bound, so time.sleep(-5) raises ValueError.
+  Clamp with max(0.0, ...) and treat a non-finite value as non-numeric. (b) trip_id
+  goes into the path unencoded. A HAFAS trip id containing ''#'' or ''/'' would break
+  the URL, so consider percent-encoding it. (c) The worker already lists these follow-ups;
+  keep them: naive datetimes are sent without an offset although the charter requires
+  Europe/Berlin; TransportError and bad JSON are not wrapped in HafasError; cached
+  values are mutable and shared with callers; the fixtures are hand-written and must
+  not count as recordings for the G1 DoD.
+
+
+  Assumption recorded: the default ttl_seconds=30 is acceptable because the task does
+  not set one and it can be overridden.'
+created: 2026-09-29T08:18:40+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0013
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: HAFAS REST client with bounded TTL cache and 429/503 backoff, using the T-0012
+  harness (client part of parked T-0011)
+why: G1 reads departures, remarks and journeys from v6.bvg.transport.rest. The charter
+  requires production code to cache and back off, because the public instance allows
+  about 100 req/min. The G3 scheduler fetches through this client.
+acceptance:
+- uv run pytest -q tests/test_hafas_client.py
+- uv run pytest -q
+- uv run python -c "import pendel.hafas"
+allowed_paths:
+- src/pendel/hafas/**
+- tests/test_hafas_client.py
+- tests/fixtures/hafas/client/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- pyproject.toml
+- uv.lock
+rank: 0
+park_reason: 'reviewer said revise: Most of the work is right, but one required test
+  does not check what the task asks for. The diff only touches allowed_paths, adds
+  no dependency, makes no live calls, and serves G1/M1. The client matches the task
+  notes: the cache key is path plus sorted params, expired entries are purged on insert,
+  the cache is capped FIFO at max_entries=256, retries sleep 0.5/1/2 s with at most
+  3 retries, and a numeric Retry-After is honoured up to 10 s. Other 4xx/5xx raise
+  HafasError at once. The attempt-1 gaps are closed: every endpoint has a query-param
+  test, Retry-After is tested at 3'

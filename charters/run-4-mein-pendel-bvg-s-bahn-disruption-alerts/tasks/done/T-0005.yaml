@@ -1,0 +1,104 @@
+depends_on:
+- T-0004
+new_tests_required: true
+attempts: 1
+notes:
+- 'Pure function in src/pendel/alternatives.py: suggest_alternative(commute, verdict,
+  journeys_json) -> Alternative | None. When verdict.affected is False, return None.
+  Otherwise return the earliest journey whose legs avoid every line the commute rides
+  that the verdict reports as affected, and that has no cancelled leg. Return a short
+  DE and EN one-line summary (for example ''U2 07:41 → S Test West ab 07:58'' / ''U2
+  07:41 → S Test West dep 07:58'').'
+- Return None when nothing qualifies. Test that case, and also the case where every
+  journey uses the affected line.
+- Keep it separate from engine.py and do not change engine.py. Only read the Verdict
+  fields it already has. If you need the affected line names, derive them from the
+  commute's lines together with the verdict. Do not add fields to Verdict. The scheduler
+  and web tasks do the wire-up.
+- Make no live calls; the recorded /journeys fixture is not available. Hand-make small
+  /journeys-shaped JSON files under tests/fixtures/hafas/alternatives/ named synthetic_*.json,
+  with a 'journeys' list. Each journey has 'legs' with origin/destination {id,name},
+  departure/plannedDeparture, arrival, line {id,name,product}, cancelled, and walking
+  legs without 'line'. Every leg sequence reaches the destination stop. Follow the
+  style of tests/fixtures/hafas/engine/synthetic_*.json.
+- Times are Europe/Berlin. Include one test whose journeys cross a DST transition,
+  and format the summary in local time.
+- 'attempt 1: reviewer said revise: The work is in scope and serves G1/M1. It touches
+  only allowed paths, leaves engine.py and Verdict unchanged, adds no dependencies,
+  and the gates pass. Recovering the line from disruption_key matches engine.py''s
+  key format (f"{kind}:{line_name}:..."), and falling back to all commute lines is
+  a reasonable conservative choice. The cancelled-leg and earliest-wins test is meaningful:
+  the cancelled U5 at 07:30 would win if the cancelled check were removed. Please
+  fix the following before approval.
+
+
+  1) The fixtures break the task''s explicit rule that every leg sequence reaches
+  the destination stop. The test commute''s destination is 900000200002 (S Test West).
+  In synthetic_alternative_found.json the journeys end at S Test Süd (900000300003),
+  S Final Ziel (900000400004) and S Test Mitte (900000500005); the chosen U2 journey
+  ends at 900000400004, not the commute destination. synthetic_all_affected.json ends
+  one journey at S Test Süd, and synthetic_dst_spring_forward.json ends at S Test
+  Nord and S Test Ring. Make every journey''s final leg end at the commute''s destination_stop_id
+  (or set the test commute''s destination to match the fixture), so the fixtures really
+  are /journeys-shaped for this origin/destination. In the multi-leg journey, the
+  second leg should run from the transfer stop to the destination. Include at least
+  one real walking leg (no ''line'') as the task asks, and make clear whether ''ab
+  07:58'' refers to the next transit line or to a walk.
+
+
+  2) The DST test does not test DST handling. Every fixture time already carries the
+  correct local offset (+01:00 / +02:00), so the test would still pass if the .astimezone(BERLIN)
+  calls were removed. Use UTC timestamps (''Z'' or +00:00) around the 2026-03-29 transition,
+  for example 00:45Z → 01:45 CET and 01:10Z → 03:10 CEST, so the assertion depends
+  on the local-time conversion. Also, ''2026-03-29T02:00:00+01:00'' is an unusual
+  way to write 03:00 CEST; use a normal instant instead.
+
+
+  3) Minor: sorting uses legs[0] departure, while the summary uses the first transit
+  leg. That is fine, but make it deliberate and consistent. _leg_time prefers plannedDeparture
+  over the realtime departure. For a disruption alternative, the realtime time is
+  arguably what the user needs. Either prefer ''departure'' with a fallback to planned,
+  or document the choice. Consider a test where planned and realtime differ.
+
+
+  Assumption recorded: the worker''s reading of the summary format (next leg''s departure
+  for multi-leg journeys, own arrival for direct ones) is acceptable, given the task''s
+  example.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0005
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Suggest an alternative connection from a HAFAS v6 /journeys-shaped response
+  when the commute is affected (labelled synthetic fixtures)
+why: G1 requires the engine to suggest an alternative connection when one exists.
+  The recorded /journeys fixture (T-0016) is blocked because live recording fails
+  in this sandbox. The suggestion logic is pure, so it is built and tested on labelled
+  synthetic /journeys-shaped inputs, the same way T-0004 was. This also unblocks the
+  G3 scheduler (T-0009).
+acceptance:
+- uv run pytest -q tests/test_alternatives.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/alternatives.py
+- tests/test_alternatives.py
+- tests/fixtures/hafas/alternatives/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- src/pendel/commute.py
+- tests/fixtures/hafas/engine/**
+- tests/fixtures/hafas/harness/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 956bb3b
+merged_at: 2026-09-29T13:01:57+0200

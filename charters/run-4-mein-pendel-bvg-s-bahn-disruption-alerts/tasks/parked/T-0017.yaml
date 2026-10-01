@@ -1,0 +1,73 @@
+depends_on:
+- T-0022
+new_tests_required: true
+attempts: 0
+notes:
+- 'Live-call budget: at most 15 requests in total, at least 1 s apart. Never loop
+  over stations. Report the exact count.'
+- 'Replacement service: a real departure of a replacement bus for a RAIL line (S-Bahn,
+  U-Bahn or tram), for example a line named with SEV or Ersatz, or a remark saying
+  Ersatzverkehr or Schienenersatzverkehr on an S/U line. A replacement for a bus line
+  does not count.'
+- 'Warning: a remark of type ''warning'' whose text or summary describes a real disruption
+  (Störung, Einschränkung, Umleitung, Ausfall or similar). Status remarks such as
+  ''Additional service'' (text.realtime.journey.additional.service) and hint remarks
+  do not count.'
+- Prefer verbatim-trimmed. Deriving is allowed only as a minimal edit of a real recorded
+  rail departure, using only codes and wording seen verbatim in real responses, and
+  it must be labelled 'derived' in the README with the list of changed fields. Never
+  invent remark codes.
+- test_fixtures_shape.py gets per-kind checks for both files that would have rejected
+  the 'Additional service' remark and a bus-line SEV.
+- If a kind cannot be found within the budget and cannot be faithfully derived, leave
+  that file out, report blocked, and name the missing kind with what you tried. If
+  network access is blocked, report blocked with the exact command and its error.
+  Never work around the sandbox.
+created: 2026-09-29T09:30:36+0200
+max_diff_lines: 500
+timeout_min: 60
+max_turns: 80
+status: parked
+id: T-0017
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record real Ersatzverkehr (rail replacement) and genuine warning/Störung departures
+  fixtures (part 3 of parked T-0002)
+why: G1 names Ersatzverkehr as a disruption kind, and its definition of done needs
+  at least five real disruption kinds. T-0015 covers three (cancellation, delay, construction).
+  This task adds a real rail replacement service and a real warning/Störung remark,
+  which attempt 1 of T-0002 got wrong (it counted an 'Additional service' remark and
+  invented a SEV on a bus line).
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/departures_replacement_service.json
+- test -f tests/fixtures/hafas/departures_warning.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/departures_replacement_service.json
+- tests/fixtures/hafas/departures_warning.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- tests/fixtures/hafas/departures_undisturbed.json
+- tests/fixtures/hafas/departures_cancellation.json
+- tests/fixtures/hafas/departures_delay.json
+- tests/fixtures/hafas/departures_construction.json
+- tests/fixtures/hafas/journeys_*.json
+- tests/fixtures/hafas/locations_*.json
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 6
+park_reason: Blocked upstream. It is in the live-recording chain (T-0022 → T-0017),
+  and T-0020 is parked after 2 blocked attempts. Live HAFAS recording fails in this
+  sandbox and needs a human decision on network access.

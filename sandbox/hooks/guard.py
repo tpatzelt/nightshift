@@ -119,6 +119,11 @@ def check_path(tool: str, raw_path: str) -> None:
     for glob in protected_globs():
         if fnmatch.fnmatch(rel, glob) or fnmatch.fnmatch(rel, glob.rstrip("/") + "/*"):
             block(tool, rel, f"path matches the task's protected_paths ({glob})")
+    # The worker prompt's first instruction is to read TASK.md, so reading it must
+    # pass. Blocking it only stopped workers that obey the guard; the others used
+    # `cat`, which this hook never sees.
+    if tool == "Read" and rel == ".nightshift/TASK.md":
+        allow(tool, str(resolved))
     if rel.startswith(".nightshift"):
         block(tool, rel, ".nightshift is orchestrator bookkeeping, not task scope")
     allow(tool, str(resolved))

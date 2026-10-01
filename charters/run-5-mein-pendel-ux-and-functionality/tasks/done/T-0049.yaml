@@ -1,0 +1,72 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Tests only. Add ONE new test function, test_today_g3_definition_of_done, to tests/test_web_today.py.
+  Do not edit existing tests or production code. If an assertion fails because of
+  a real production bug, report status ''blocked'' with the failing assertion in followups.
+  Always finish with an explicit status: the previous two attempts were parked because
+  no status was reported.'
+- 'Reuse the file''s helpers: _seed_commutes, _RECORDED_NOW (Wed 2026-09-30 08:00
+  Europe/Berlin), _recorded_multi_status_hafas_client (Alexanderplatz 900100003 ->
+  departures_undisturbed.json, Ostkreuz 900120003 -> departures_warning.json, _FAILED_STOP_ID
+  -> 404, _PAUSED_STOP_ID -> must not be fetched, /journeys -> empty).'
+- 'OK card: origin Alexanderplatz, lines {''U8''}, weekdays {2}, window 07:15-07:25.
+  In departures_undisturbed.json, U8 is planned 07:18 with real-time 07:19. Assert
+  that the card contains <time datetime="2026-09-30T07:18:00+02:00">07:18</time> and
+  <time datetime="2026-09-30T07:19:00+02:00">07:19</time>.'
+- 'Disrupted card: origin Ostkreuz, lines {''RB32''}, weekdays {2}, window 07:40-07:50.
+  The RB32 07:46 warning has the generic summary ''Störung.'' and text ''Ausfall RB<a
+  href=...>18207</a> von Oranienburg ...''. Assert that ''Ausfall'' and ''Oranienburg''
+  appear in the disrupted card, and that neither ''<a href'' nor ''Störung auf RB32:
+  Störung.'' does. Check test_engine_recorded.py::test_generic_remark_summary_falls_back_to_the_remark_text
+  for the engine-side behaviour.'
+- 'Paused and failed cards: the same as in the existing multi-status test (paused=True,
+  and _FAILED_STOP_ID). Give every commute an origin_name and a destination_name,
+  and assert that each ''origin → destination'' title appears.'
+- Assert that all four labels (OK, Gestört, Pausiert, Prüfung fehlgeschlagen) appear.
+  Also assert that re.search(r'(?<!\d)9\d{8}(?!\d)', text) is None, so no 9-digit
+  stop ID appears.
+- 'Caution: _card_block''s regex ends at the first ''</li>'', which for OK and disrupted
+  cards is inside the nested <ul class="departures">. To isolate a card, split the
+  text on ''<li data-commute-id='' instead of using _card_block.'
+created: 2026-09-30T19:26:54+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0049
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: G3 definition-of-done test for the today page (re-issue of parked T-0015, narrower
+  and with concrete fixture facts)
+why: 'G3 definition of done: one test renders /today for an OK, a disrupted, a paused
+  and a failed-check commute, shows stop names and no raw IDs, shows planned and real-time
+  times, and shows the cleaned-remark fallback for a generic summary. The existing
+  test_today_shows_one_card_per_status_with_stop_names_and_no_raw_ids covers the statuses
+  and names. Its disrupted card uses RB26, whose summary is not generic, and no assertion
+  there checks planned vs real-time. T-0015 was parked twice because the worker never
+  reported a status.'
+acceptance:
+- uv run pytest -q tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- tests/test_web_today.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 0
+merged_sha: fbddd80
+merged_at: 2026-10-01T00:26:06+0200

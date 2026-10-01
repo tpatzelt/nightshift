@@ -1,0 +1,91 @@
+depends_on:
+- T-0002
+- T-0003
+- T-0004
+new_tests_required: true
+attempts: 1
+notes:
+- GET /commutes/new requires origin_stop_id, destination_stop_id and both names; without
+  them, show a link back to /stops. Stop IDs and names travel as hidden inputs, and
+  the names are shown as text. Remove the typed stop-ID inputs and the free-text lines
+  input.
+- Fetch the origin's departures through the injected get_hafas_client, using the same
+  _hafas_lock / run_in_threadpool pattern as _fetch_departures, at get_now() for about
+  60 minutes. Render one checkbox per engine.line_choices() entry (name=lines, value=<line
+  name>). On HafasError or no lines, show a role=alert message and a retry link; never
+  fall back to a text field.
+- 'Defaults: Mon-Fri checked; window_start is the next full half hour after get_now(),
+  rounded up to :00 or :30; window_end is start + 30 min; delay is 5. Assumption:
+  if start + 30 would cross midnight, clamp window_end to 23:59 until midnight-crossing
+  windows land in T-0016, and leave a code comment saying so.'
+- POST /commutes reads the repeated `lines` values (parse_qs lists) plus origin_name
+  and destination_name, and stores them via db.add_commute from T-0002. Keep the 400
+  + role=alert error path.
+- In tests, override get_hafas_client with an httpx.MockTransport that replays tests/fixtures/hafas/recorded/departures_undisturbed.json,
+  and override get_now. Update the existing tests in test_web_commutes.py and test_web_a11y.py
+  that post the old free-text form.
+- No required <script>. Add German and English for every new string, and keep the
+  360px viewport test passing.
+- 'attempt 1: reviewer said revise: Almost everything is right. GET /commutes/new
+  needs all four stop params, and without them it links back to /stops without calling
+  HAFAS. It renders one checkbox per engine.line_choices() entry, taken from the real
+  departures_undisturbed.json fixture (S3/S5 exist there). On HafasError or when no
+  lines come back, it shows a role=alert message and a retry link and never falls
+  back to a text field. Hidden inputs, names shown as text, XSS escaping and POST
+  storing origin_name/destination_name via add_commute are all correct. The Mon–Fri
+  and 5-minute defaults are correct and covered by tests. The removed i18n keys are
+  not used anywhere else. One thing has to change. The midnight clamp in _default_window
+  goes against the task note and the charter''s G1 default. The note says window_start
+  is the next full half hour after get_now(), and only window_end is clamped to 23:59
+  if start+30 would cross midnight. The code instead also moves the start back to
+  23:30 whenever the next half hour is 00:00, so a visitor at 23:45 gets a default
+  of 23:30–23:59. That window starts in the past. But 00:00–00:30 does not cross midnight
+  at all, so it is a valid window and is exactly what the spec asks for. The new test
+  test_commutes_new_form_clamps_window_when_next_half_hour_would_cross_midnight locks
+  in the wrong behaviour, and its docstring is wrong too (''would push window_end
+  to 00:30 the next day'' is not a midnight crossing). Fixes: (1) In _default_window,
+  wrap the rounded start modulo 24*60, so 23:45 gives start 00:00 and end 00:30. Clamp
+  only the end: when start is 23:30, end becomes 23:59. Remove the min(total_minutes,
+  23*60+30) line and update the code comment to match. (2) Change the test to cover
+  both cases: get_now 23:10 CEST should give 23:30–23:59, and 23:45 CEST should give
+  00:00–00:30. Minor points, not blocking: the retry-link assertion only checks the
+  first parameter; it could also check that origin_name is carried in the link. Re-fetching
+  the origin''s departures on a POST validation error is acceptable and was disclosed.
+  Returning 503 for the lines-unavailable case is consistent with /stops.'
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 600
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0005
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Setup screen 3: line checkboxes from origin departures, sensible defaults,
+  save names'
+why: 'G1: the visitor picks lines from checkboxes of the lines departing from the
+  origin, never typed. Defaults are Mon-Fri, a 30-minute window from the next full
+  half hour and a 5-minute delay threshold. Stop names are stored, and no stop ID
+  or line name is typed.'
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py tests/test_web_a11y.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/commute_new.html
+- src/pendel/i18n.py
+- tests/test_web_commutes.py
+- tests/test_web_a11y.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+merged_sha: 735b86b
+merged_at: 2026-09-30T13:51:18+0200

@@ -1,0 +1,173 @@
+depends_on:
+- T-0031
+new_tests_required: true
+attempts: 2
+notes:
+- 'Do NOT run docker or docker compose: the NIGHTSHIFT guard blocks every Docker call
+  in this sandbox. The charter''s `docker build .` and `docker compose config` checks
+  stay unverified and a human must run them. Say so in DEPLOY.md and in your followups.'
+- 'Dockerfile: pin the base image to a specific version tag (for example python:3.12.x-slim-bookworm
+  with a real patch version, never :latest). Install with uv from uv.lock, run as
+  a non-root USER, set PENDEL_DATA_DIR=/data, and add a HEALTHCHECK that calls http://127.0.0.1:8000/healthz
+  with python''s urllib (no curl dependency). CMD is uv run/uvicorn pendel.app:app
+  --host 0.0.0.0 --port 8000.'
+- 'deploy/compose.yaml: two services from the same image, ''web'' (uvicorn) and ''scheduler''
+  (python -m pendel.runner). Both get env_file: .pendel.env and the volume /opt/dockerdata/pendel:/data.
+  Only web joins the external network caddy_network. No `ports:` key anywhere. Image:
+  ghcr.io/tpatzelt/mein-pendel:latest.'
+- 'deploy/.pendel.env.example lists every env var the code reads, each with a placeholder
+  value and a comment: PENDEL_DATA_DIR, PENDEL_TELEGRAM_BOT_TOKEN, PENDEL_TELEGRAM_BOT_USERNAME,
+  PENDEL_NTFY_URL, PENDEL_CHECK_LEAD_MIN, PENDEL_HAFAS_BASE_URL (and PENDEL_RATE_LIMIT_PER_MIN,
+  marked as used once rate limiting lands). No real tokens, domains or LAN IPs. .gitignore
+  already allows .*.env.example.'
+- 'Workflow: on push to main, check out, set up uv, run `uv run pytest -q`, then log
+  in to ghcr.io with GITHUB_TOKEN and build/push the tags ghcr.io/tpatzelt/mein-pendel:latest
+  and :sha-<short sha>. Pin actions to major versions.'
+- 'DEPLOY.md: give numbered steps, the exact Caddy route block (with a placeholder
+  domain such as pendel.example.org reverse_proxy to web:8000) and the cloudflared
+  ingress lines (hostname placeholder, service http://caddy:80 or whatever matches
+  the convention you document). Also say that the homelab repo itself is not edited
+  (charter non-goal).'
+- 'tests/test_deploy.py uses stdlib text checks only (PyYAML is not a dependency;
+  do not add one). Assert: the Dockerfile has a non-root USER, a HEALTHCHECK hitting
+  /healthz, and no FROM with :latest or without a tag; compose contains caddy_network,
+  external: true, /opt/dockerdata/pendel, env_file, and no ''ports:''; every PENDEL_
+  var found with grep in src/pendel/**/*.py appears in the env example; the workflow
+  names ghcr.io/tpatzelt/mein-pendel:latest and sha-; no tab characters in the YAML
+  files. Assumption: full YAML validity is left to the human''s `docker compose config`
+  run.'
+- 'attempt 1: reviewer said revise: The files match G4/M4 and stay within allowed_paths,
+  and the gates pass. Four things need fixing before this can ship.
+
+
+  (1) Container startup problem. The image installs with `uv sync --locked --no-dev`,
+  but CMD and the compose scheduler command both use plain `uv run`. pyproject.toml
+  has a `[dependency-groups] dev = ["pytest"]` group, and plain `uv run` re-syncs
+  the environment with the default groups on every start. So each container start
+  would try to download and install pytest into /app/.venv. That needs network access
+  at runtime, slows startup, and puts dev dependencies into production. If the host
+  is offline or the download is blocked, startup fails. Fix: set `ENV UV_NO_SYNC=1`
+  (or `UV_NO_DEV=1` plus `--no-sync`) in the Dockerfile, or call the venv binaries
+  directly (`/app/.venv/bin/uvicorn ...`, `/app/.venv/bin/python -m pendel.runner`).
+
+
+  (2) The scheduler will always show as unhealthy. It inherits the Dockerfile HEALTHCHECK,
+  which calls http://127.0.0.1:8000/healthz, but pendel.runner serves no HTTP. Add
+  `healthcheck: {disable: true}` to the scheduler service in deploy/compose.yaml,
+  or give it a check that fits a process with no HTTP server.
+
+
+  (3) The env example contradicts its own comments. They say ''Leave unset to disable
+  the Telegram/ntfy channel'', but it ships non-empty placeholders (`changeme-telegram-bot-token`,
+  `https://ntfy.example.org`). runner.py enables a channel whenever the variable is
+  set, so `cp .pendel.env.example .pendel.env` switches on both channels with bogus
+  credentials. Either leave the optional ones empty or commented out, or change the
+  comments and DEPLOY.md step 2 to say they must be replaced or removed.
+
+
+  (4) Tests. `test_dockerfile_has_healthcheck_hitting_healthz` passes if ''/healthz''
+  appears anywhere in the Dockerfile, so it doesn''t check that the HEALTHCHECK instruction
+  itself calls /healthz. Match the full HEALTHCHECK instruction, including continuation
+  lines, and assert /healthz and urllib inside it. Also add tests that would have
+  caught (1) and (2): CMD and the compose commands must not use a bare `uv run` without
+  --no-sync or UV_NO_SYNC, and the scheduler service must disable or override the
+  healthcheck.
+
+
+  Minor, optional: `test_deploy_doc_and_files_exist` repeats the acceptance `test
+  -f` checks and adds nothing. Everything else looks right: USER is non-root, the
+  base image tag is pinned, compose has no `ports:`, `caddy_network` is external,
+  the volume path and env_file are correct, the workflow tags and pinned action versions
+  are correct, DEPLOY.md says the homelab repo is not edited, and it notes the docker
+  checks it could not run. `docker build .` and `docker compose config` are still
+  unverified because the sandbox blocks all docker commands, so a human must run them.'
+- 'attempt 2: reviewer said revise: All four points from attempt 1 are fixed: CMD
+  uses the venv binaries, the scheduler healthcheck is disabled, the channel vars
+  ship empty, and the HEALTHCHECK test is tighter. Scope stays within allowed_paths.
+  Two new operational bugs remain.
+
+
+  (1) An empty PENDEL_CHECK_LEAD_MIN crashes the scheduler. The example ships `PENDEL_CHECK_LEAD_MIN=`
+  and DEPLOY.md step 2 says to ''leave empty to use the built-in default''. But compose
+  passes an empty env_file value as the empty string. src/pendel/scheduler.py:_lead_minutes_from_env
+  only falls back to the default when the variable is None; otherwise it runs int(raw),
+  and int('''') raises ValueError. So if the example is copied and left as is, the
+  scheduler fails and restart-loops. Fix it within allowed_paths: comment out the
+  line (`# PENDEL_CHECK_LEAD_MIN=30`) or ship a real value (`PENDEL_CHECK_LEAD_MIN=30`).
+  Update DEPLOY.md to match. Do the same for PENDEL_RATE_LIMIT_PER_MIN so the future
+  rate-limit code doesn''t hit the same trap. Add a test that every non-commented
+  numeric var in the example is either absent or a valid integer. More generally,
+  only ship `VAR=` empty where the code treats an empty string as unset.
+
+
+  (2) The env file path in DEPLOY.md doesn''t match compose. Step 2 copies the example
+  to /opt/dockerdata/pendel/.pendel.env. Step 4 runs `cd deploy && docker compose
+  up -d`, and `env_file: .pendel.env` resolves relative to the compose file''s directory,
+  i.e. deploy/.pendel.env. Compose would fail because the env file doesn''t exist.
+  Also, /opt/dockerdata/pendel is mounted into both containers as /data, so putting
+  the secrets file there exposes it inside the containers'' data volume. Make the
+  steps consistent: copy it to deploy/.pendel.env next to compose.yaml, or whatever
+  location the homelab convention uses, and keep it out of the data volume.
+
+
+  Minor, optional:
+
+  - The Dockerfile comment says uv is ''pinned by digest tag'', but it is pinned by
+  a version tag. Fix the wording.
+
+  - `test_deploy_doc_mentions_homelab_repo_is_not_edited` is weak: `''not'' in lowered`
+  matches almost any text.
+
+
+  Unverified: `docker build .` and `docker compose config` could not be run because
+  the sandbox blocks docker, so a human must still run both.'
+created: 2026-09-29T18:26:41+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0032
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: Dockerfile, deploy/compose.yaml, deploy/.pendel.env.example, GitHub Actions
+  workflow and DEPLOY.md, with a static structure test
+why: G4 needs a non-root Dockerfile with a healthcheck, a compose file that follows
+  the homelab conventions (external caddy_network, /opt/dockerdata/pendel, pinned
+  images, env_file, no host ports), a workflow that runs the tests and publishes ghcr.io/tpatzelt/mein-pendel:latest
+  and sha-<short>, and DEPLOY.md. None of these files exist yet.
+acceptance:
+- test -f Dockerfile
+- test -f deploy/compose.yaml
+- test -f deploy/.pendel.env.example
+- test -f .github/workflows/ci.yaml
+- test -f DEPLOY.md
+- uv run pytest -q tests/test_deploy.py
+- uv run pytest -q
+allowed_paths:
+- Dockerfile
+- .dockerignore
+- deploy/compose.yaml
+- deploy/.pendel.env.example
+- .github/workflows/ci.yaml
+- DEPLOY.md
+- tests/test_deploy.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: 'reviewer said revise: All four points from attempt 1 are fixed: CMD
+  uses the venv binaries, the scheduler healthcheck is disabled, the channel vars
+  ship empty, and the HEALTHCHECK test is tighter. Scope stays within allowed_paths.
+  Two new operational bugs remain.
+
+
+  (1) An empty PENDEL_CHECK_LEAD_MIN crashes the scheduler. The example ships `PENDEL_CHECK_LEAD_MIN=`
+  and DEPLOY.md step 2 says to ''leave empty to use the built-in default''. But compose
+  passes an empty env_file value as the empty string. src/pendel/scheduler.py:_lead_minutes_from_env
+  only falls back to the default when the variable is'

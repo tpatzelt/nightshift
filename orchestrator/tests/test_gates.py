@@ -137,6 +137,31 @@ expect("adding an xfail marker fails",
 r = make_repo(BASE_FILES)
 commit(r, {"src/run.sh": "pytest || true\n", "tests/test_app.py": "def test_a():\n    assert 1 == 1\n"})
 expect("'|| true' fails", gates.run_gates(TASK, r, BASE, DONE, fake_sandbox()), False, "|| true")
+r = make_repo(BASE_FILES)
+commit(r, {"tests/test_app.py": 'def test_a():\n    assert "|| true" not in open("run.sh").read()\n'})
+expect("'|| true' inside a Python string is a test about it, not a command (run 4 T-0040)",
+       gates.run_gates(TASK, r, BASE, DONE, fake_sandbox()), True)
+r = make_repo(BASE_FILES)
+commit(r, {"tests/test_app.py": 'import subprocess\n\ndef test_a():\n    subprocess.run("pytest", shell=True) or True || true\n'})
+expect("'|| true' outside a string in a .py file still fails",
+       gates.run_gates(TASK, r, BASE, DONE, fake_sandbox()), False, "|| true")
+r = make_repo(BASE_FILES)
+commit(r, {"src/ci.yaml": 'run: "pytest || true"\n', "tests/test_app.py": "def test_a():\n    assert 1 == 1\n"})
+expect("a quoted '|| true' in YAML still runs, so it still fails",
+       gates.run_gates(TASK, r, BASE, DONE, fake_sandbox()), False, "|| true")
+
+print("\n--- gate 1 says why a worker stopped, when the loop knows ---")
+r = make_repo(BASE_FILES)
+stopped = gates.run_gates(TASK, r, BASE, {}, fake_sandbox(),
+                          worker_stopped="turn limit reached (41 turns, limit 40)")
+expect("a worker that ran out of turns is named as such",
+       stopped, False, "turn limit reached")
+check("and not as status=None", "status=None" not in stopped.report(), stopped.report())
+expect("without a known reason, the old message stays",
+       gates.run_gates(TASK, r, BASE, {}, fake_sandbox()), False, "status=None")
+expect("a worker that reported 'blocked' keeps its own status",
+       gates.run_gates(TASK, r, BASE, {"status": "blocked"}, fake_sandbox(),
+                       worker_stopped="timed out"), False, "status='blocked'")
 
 print("\n--- gate 6: new tests required ---")
 r = make_repo(BASE_FILES)

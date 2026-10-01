@@ -1,0 +1,12 @@
+# Idle-phase G2 gap: two-step stop search so the destination can be picked by name (T-0044)
+
+_Recorded 20260930-041457 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty. G1's definition of done is still blocked: live HAFAS recording has been blocked in this sandbox for T-0002, T-0015 and T-0020, twice each, and the recording chain T-0016/T-0017/T-0018/T-0020-T-0022 stays parked until a human decides on network access. G3, G2, G4 and G5 have their definition-of-done tests in place. Reading /repo/mein-pendel showed a real G2 usability gap. /stops result links only prefill origin_stop_id, and the commute form asks for the destination as a raw HAFAS ID ('Ziel-Haltestelle (ID)'). A visitor can search for the origin but has to know the destination's internal ID, which undercuts G2's 'visitor searches stops, saves one or more commutes'. There were no worker followups.
+
+## Decision
+Add T-0044 (G2/M2): /stops takes an optional origin_stop_id, and when it is present the results link to /commutes/new with both IDs. The commute form links to the destination search when only the origin is set. The work is limited to app.py, stops.html, commute_new.html, i18n.py and the two existing web test files, with a 250-line diff cap, synthetic fixtures that already exist, no JS and no schema change. Assumptions, taking the conservative reading: this completes behaviour the G2 goal text already describes and adds no new goal, so it is within G2 and not 'something new'. Showing stop names instead of IDs on /today would need a schema migration, so it is deliberately not scheduled. The parked live-recording chain is not retried, because repeating a known-blocked probe would only burn attempts. Synthetic fixtures still never count toward G1. No milestone is added, since M2 covers this. The planner made no live calls.
+
+## Consequences
+Once T-0044 is done, a visitor can save a commute entirely by searching stops by name, on a phone, with no JS. Still open and needing a human: (1) network access for live HAFAS recording, which would unpark T-0020, then T-0016/T-0021/T-0022/T-0017 and T-0018, to meet G1's definition of done, the top-priority goal; (2) confirming that deploy/verify.sh passes in CI, since the sandbox cannot run Docker; (3) real Impressum and Datenschutz details in place of the placeholders. After T-0044, only further allowed idle work remains until (1) is resolved.

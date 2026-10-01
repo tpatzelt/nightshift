@@ -1,0 +1,84 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- This retries parked T-0009, which got 'revise' twice. Read /plan/parked/T-0009.yaml
+  before you start. Everything the reviewer accepted in attempt 2 must be in your
+  version too. src/pendel/scheduler.py does not exist in the repo yet, so write it
+  from scratch.
+- tick(now) checks each active commute whose window starts within the lead time or
+  is open now. The lead time comes from env PENDEL_CHECK_LEAD_MIN, default 30, validated
+  once in __init__; a non-integer value raises at construction. Group the due commutes
+  by origin_stop_id and call HafasClient.departures() once per stop, with a duration
+  long enough to cover the latest window_end in that group. Run pendel.engine.evaluate
+  with delay_threshold_min=commute.delay_threshold_min, because evaluate's default
+  is independent of the commute. Then call pendel.tracker.process(conn, commute_id,
+  verdict, channels, now).
+- 'For affected verdicts, call pendel.alternatives.suggest_alternative on HafasClient.journeys()
+  and append its summary_de/summary_en to reason_de/reason_en, for example with dataclasses.replace.
+  Rate-limit hygiene: skip the journeys() lookup when verdict.disruption_key is already
+  ''active'' in the notifications table for that commute. A read-only SELECT is fine.'
+- Error isolation, which is the one reason attempt 2 was not approved. (a) In run_forever,
+  wrap every tick in try/except Exception with logger.exception, and always call sleep
+  afterwards. (b) In tick, catch HafasError per stop, and catch and log any Exception
+  per commute around the evaluate/track step, so that one commute failing does not
+  skip the others.
+- 'Required tests: a simulated morning with 06:30 undisturbed, 06:45 Ersatzverkehr,
+  07:00 same, 07:15 cleared, asserting exactly one activation and one resolved message;
+  nothing sent for a commute on an unaffected line; two same-stop commutes with different
+  windows cause a single departures request; one stop''s replay returns 503 and the
+  other stop is still processed; the alternative text appears in the message; a bounded
+  run_forever test with an injected clock and a sleep that raises a sentinel after
+  N calls, where the first tick raises and the loop still continues (it must never
+  loop for real); one commute''s FakeChannel-like send raises and another commute''s
+  notification is still sent.'
+- Clock, HafasClient (on an httpx.MockTransport) and channels (pendel.notify FakeChannel)
+  are injected. Select the replay fixture by the request's `when` param. Make no live
+  calls and send no request to Telegram, ntfy or any other messaging service.
+- No recorded real fixtures exist, because live recording is blocked in this sandbox.
+  Use labelled synthetic files under tests/fixtures/hafas/scheduler/synthetic_*.json,
+  shaped like tests/fixtures/hafas/engine/synthetic_*.json. These must never be presented
+  as recorded real data.
+created: 2026-09-29T17:58:07+0200
+max_diff_lines: 600
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0027
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Scheduler with injected clock and a simulated-morning test, with per-tick and
+  per-commute error isolation (retry of parked T-0009)
+why: 'This covers G3''s definition of done. A test drives the scheduler across a simulated
+  morning and asserts three things: exactly one notification per disruption per commute,
+  none when the commute is unaffected, and a resolved message when the disruption
+  clears. The scheduler must respect the HAFAS rate limit, and it must keep notifying
+  other users when one commute or one tick fails. src/pendel/scheduler.py does not
+  exist yet, and the parked T-0009 got ''revise'' on attempt 2 only because it lacked
+  error isolation.'
+acceptance:
+- uv run pytest -q tests/test_scheduler.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/scheduler.py
+- tests/test_scheduler.py
+- tests/fixtures/hafas/scheduler/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/alternatives.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- tests/fixtures/hafas/engine/**
+- tests/fixtures/hafas/harness/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 399d3dd
+merged_at: 2026-09-29T18:16:10+0200

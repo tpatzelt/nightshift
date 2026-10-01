@@ -1,0 +1,148 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- You cannot run Docker in this sandbox, and the guard blocks any shell command that
+  mentions it. Do not try to get around that. Write the script, check it with `bash
+  -n`, and cover it with static text tests in tests/test_deploy.py. The script's real
+  run happens in CI and by the human.
+- deploy/verify.sh must be executable (chmod +x), start with `#!/usr/bin/env bash`
+  and `set -euo pipefail`, and resolve the repo root from its own location so it works
+  from any working directory.
+- 'Steps, in order: (1) copy deploy/.pendel.env.example to a temp dir together with
+  a copy of deploy/compose.yaml, or point compose at it with `--env-file`/a temp `.pendel.env`,
+  in a way that leaves the repo untouched and never creates deploy/.pendel.env. Then
+  run `docker compose -f <compose> config -q`. (2) Parse .github/workflows/ci.yaml
+  and deploy/compose.yaml with PyYAML, pulled in only at script runtime, e.g. `uv
+  run --no-project --with pyyaml python -c ''...yaml.safe_load...''`. Do NOT add PyYAML
+  to pyproject.toml or uv.lock. (3) `docker build -t mein-pendel:verify .` from the
+  repo root. (4) Run the web container detached with no published host ports, no external
+  network, PENDEL_DATA_DIR pointing at a writable path inside the container, and every
+  Telegram/ntfy variable empty. Poll `docker inspect --format ''{{.State.Health.Status}}''`
+  until it reads `healthy`, failing after a bounded timeout of about 90 s. (5) Use
+  a `trap` to remove the container (and any temp dir) on every exit path.'
+- Read the Dockerfile (HEALTHCHECK, USER, CMD) and deploy/.pendel.env.example before
+  writing step 4. The container must not need the caddy_network external network for
+  this check.
+- The script must never contact Telegram, ntfy or HAFAS. /healthz makes no outbound
+  calls, so do not request any other route.
+- 'CI: add a `verify` job to .github/workflows/ci.yaml that runs `bash deploy/verify.sh`
+  on ubuntu-latest (with astral-sh/setup-uv, same as the test job). Make `build-and-push`
+  `needs: [test, verify]`. Change nothing else in the workflow.'
+- 'DEPLOY.md: add a short step before the image is started that tells the operator
+  to run `deploy/verify.sh` and explains what it checks. Keep the existing step numbering
+  consistent and do not rewrite unrelated steps.'
+- 'Tests in tests/test_deploy.py, stdlib only and in the existing style: the script
+  exists and is executable; it has the shebang and `set -euo pipefail`; it contains
+  `compose`, `config`, `build`, `Health.Status` and `trap`; it never mentions api.telegram.org
+  or ntfy.sh; it does not write deploy/.pendel.env; ci.yaml runs `deploy/verify.sh`
+  and build-and-push needs it; DEPLOY.md mentions deploy/verify.sh. Update the module
+  docstring''s sentence about Docker checks being left to a human so it points at
+  the script.'
+- "attempt 1: gate failures:\n  - diff appends '|| true' to a command: +    docker\
+  \ rm -f \"$CONTAINER_NAME\" >/dev/null 2>&1 || true\n  - diff appends '|| true'\
+  \ to a command: +    status=\"$(docker inspect --format '{{.State.Health.Status}}'\
+  \ \"$CONTAINER_NAME\" 2>/dev\n  - diff appends '|| true' to a command: +       \
+  \ docker logs \"$CONTAINER_NAME\" >&2 || true\n  - diff appends '|| true' to a command:\
+  \ +    docker logs \"$CONTAINER_NAME\" >&2 || true"
+- 'attempt 2: reviewer said revise: One concrete defect must be fixed. Everything
+  else looks sound.
+
+
+  The defect: the DEPLOY.md step numbers are now inconsistent. The task notes say
+  to keep the existing step numbering consistent. Inserting verify.sh as step 5 moved
+  the Caddy route and the cloudflared ingress rule from steps 6 and 7 to steps 7 and
+  8. The intro paragraph (DEPLOY.md lines 5-6) still says "only the two snippets in
+  steps 6 and 7 are added to the homelab repo by hand". Step 6 is now `docker compose
+  up`, so the sentence points the operator at the wrong steps. Fix: change that sentence
+  to "steps 7 and 8". Optionally, add an assertion to tests/test_deploy.py so the
+  intro''s step references are checked against the numbered Caddy and cloudflared
+  steps.
+
+
+  What I checked and found correct:
+
+  - verify.sh runs the four checks in the required order. Compose config runs against
+  a temporary copy of compose.yaml plus the example env renamed to .pendel.env, so
+  the repo is untouched and deploy/.pendel.env is never created. PyYAML is loaded
+  only at runtime through `uv run --no-project --with pyyaml`, and pyproject.toml
+  and uv.lock are untouched. The image is built from the repo root.
+
+  - The test container has no -p flag and no --network flag. PENDEL_DATA_DIR=/data,
+  and the Dockerfile creates /data owned by the pendel user, so it is writable. The
+  Telegram and ntfy variables are set empty, and the code reads them with `or`/`.get`,
+  so empty counts as unset.
+
+  - Health polling is capped at 90 s. The Dockerfile HEALTHCHECK has interval 30s
+  and start-period 10s, so the first healthy result should arrive at about 30 s, well
+  within the limit.
+
+  - The EXIT trap removes the container and the temp dir and keeps the original exit
+  status.
+
+  - To avoid `|| true`, cleanup() uses `set +e`. This matches the gate''s intent:
+  failures inside cleanup cannot hide a real failure, because `exit "$status"` is
+  kept and `docker rm` runs only if the container exists.
+
+  - The script requests no route other than the image''s own /healthz check and contains
+  no Telegram or ntfy hosts.
+
+  - CI: the new verify job mirrors the test job''s setup-uv, `build-and-push` now
+  needs `[test, verify]`, and nothing else in the workflow changed.
+
+  - Tests are the stdlib text checks the task asked for. They would fail if the change
+  were reverted, because the module reads deploy/verify.sh at import time and the
+  ci.yaml and DEPLOY.md assertions would fail. The module docstring was updated as
+  required.
+
+  - No secrets and no new dependencies. Only allowed paths were touched.'
+created: 2026-09-29T23:54:11+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0039
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'deploy/verify.sh: one script that checks compose config with the example env,
+  builds the image, waits for the container''s healthcheck and parses both YAML files,
+  and is run by CI before publishing'
+why: 'G4''s definition of done needs four checks: `docker build .` succeeds, the container
+  answers its healthcheck in a test or script, `docker compose -f deploy/compose.yaml
+  config` validates with the example env, and the workflow file is valid YAML. Today
+  none of these runs anywhere. tests/test_deploy.py only does stdlib text checks.
+  It never parses YAML (PyYAML is not a dependency) and cannot call Docker, because
+  the NIGHTSHIFT sandbox blocks the Docker daemon. This task adds one script that
+  performs all four checks, runs it in CI on ubuntu-latest (which has Docker) before
+  the image is pushed, and documents it in DEPLOY.md so the human can run it too.'
+acceptance:
+- test -x deploy/verify.sh
+- bash -n deploy/verify.sh
+- uv run pytest -q tests/test_deploy.py
+- uv run pytest -q
+allowed_paths:
+- deploy/verify.sh
+- tests/test_deploy.py
+- .github/workflows/ci.yaml
+- DEPLOY.md
+protected_paths:
+- src/**
+- tests/fixtures/**
+- Dockerfile
+- deploy/compose.yaml
+- deploy/.pendel.env.example
+- pyproject.toml
+- uv.lock
+- /plan/**
+park_reason: 'reviewer said revise: One concrete defect must be fixed. Everything
+  else looks sound.
+
+
+  The defect: the DEPLOY.md step numbers are now inconsistent. The task notes say
+  to keep the existing step numbering consistent. Inserting verify.sh as step 5 moved
+  the Caddy route and the cloudflared ingress rule from steps 6 and 7 to steps 7 and
+  8. The intro paragraph (DEPLOY.md lines 5-6) still says "only the two snippets in
+  steps 6 and 7 are added to the homelab repo by hand". Step 6 is now `docker compose
+  up`, so the sentence points the operator at the wrong steps. Fix: change that sentence
+  to "steps 7 a'

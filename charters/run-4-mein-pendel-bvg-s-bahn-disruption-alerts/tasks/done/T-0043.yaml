@@ -1,0 +1,53 @@
+depends_on:
+- T-0042
+new_tests_required: true
+attempts: 0
+notes:
+- In _lead_minutes_from_env, after int(raw), raise ValueError(f"{_LEAD_ENV_VAR} must
+  be a positive integer, got {raw!r}") when the value is <= 0. Update the existing
+  non-integer message to say 'positive integer' too. Mirror ratelimit.rate_limit_per_min_from_env,
+  but do not edit ratelimit.py.
+- Keep the current behaviour when the variable is unset (default 30) and when it is
+  not an integer (ValueError). An empty string must still raise ValueError, since
+  the env example tells operators never to leave an uncommented value empty.
+- 'Add parametrized tests to tests/test_scheduler.py, with ''lead'' in their names,
+  for ''0'' and ''-5'' (ValueError at Scheduler construction) and for ''45'' (accepted:
+  a commute with window 08:00 is due at 07:15 Berlin and not at 07:14). Use monkeypatch.setenv,
+  as test_invalid_lead_minutes_env_var_raises_at_construction does.'
+- No other files, no new dependencies, no network.
+created: 2026-09-30T03:42:56+0200
+max_diff_lines: 80
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0043
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Reject a zero or negative PENDEL_CHECK_LEAD_MIN at scheduler construction,
+  matching the documented 'positive integer' rule
+why: deploy/.pendel.env.example documents PENDEL_CHECK_LEAD_MIN as 'Must be a positive
+  integer', and ratelimit.rate_limit_per_min_from_env enforces that for its variable.
+  scheduler._lead_minutes_from_env accepts 0 or negative values, though. A negative
+  lead makes a commute due only after its window has started, which silently breaks
+  G3's 'checks each saved commute shortly before its departure window'. Failing loudly
+  at startup keeps the scheduler's behaviour predictable.
+acceptance:
+- uv run pytest -q tests/test_scheduler.py -k lead
+- uv run pytest -q
+allowed_paths:
+- src/pendel/scheduler.py
+- tests/test_scheduler.py
+protected_paths:
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- .github/**
+- Dockerfile
+- DEPLOY.md
+- pyproject.toml
+- uv.lock
+- src/pendel/ratelimit.py
+- src/pendel/migrations/**
+merged_sha: 31a6e1a
+merged_at: 2026-09-30T03:48:46+0200

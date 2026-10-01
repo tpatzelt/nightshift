@@ -1,0 +1,70 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Start from the current tree. Nothing from T-0001 or T-0011 was merged.
+- The environment already syncs with `uv sync`. Running uv or pytest is fine. Do not
+  make any HTTP request to v6.bvg.transport.rest or anywhere else in this task.
+- tests/conftest.py gets an autouse fixture that monkeypatches socket.socket.connect
+  (and connect_ex) so it raises for AF_INET and AF_INET6. Leave AF_UNIX alone so asyncio
+  and anyio keep working.
+- 'tests/conftest.py also gets a fixture `hafas_replay`. It returns a factory: routes
+  dict {url_path: file path relative to tests/fixtures/hafas/} -> httpx.MockTransport
+  that answers 200 with that file''s JSON. An unmapped path raises LookupError naming
+  the path.'
+- 'tests/test_harness.py must prove three things: the guard fires on a real TCP connect
+  attempt (for example to 127.0.0.1 on any port), replay returns the JSON of a tiny
+  hand-made file under tests/fixtures/hafas/harness/, and an unmapped path raises
+  LookupError.'
+- If anything blocks you, report the exact command and its error output in your final
+  report.
+- 'attempt 1: reviewer said revise: The diff fits G1/M1. It stays inside allowed_paths
+  (conftest.py, test_harness.py, harness/example.json), adds no dependency, secret
+  or network call, and the conftest implementation looks correct: AF_INET and AF_INET6
+  are blocked, AF_UNIX is left alone, and an unmapped path raises LookupError(path).
+  One test is still a tautology, which fails the third approval criterion. test_network_guard_blocks_real_tcp_connect
+  only asserts `pytest.raises(OSError)` when connecting to 127.0.0.1:54321. If the
+  guard is removed, that connect still raises ConnectionRefusedError, which is a subclass
+  of OSError, so the test passes either way. It does not prove the guard fires, and
+  the task''s notes list that as the first thing test_harness.py must prove. Required
+  fix: make the test specific to the guard. Either import NetworkBlockedError from
+  conftest (or expose it through a fixture) and use `pytest.raises(NetworkBlockedError)`,
+  or use `pytest.raises(OSError, match="network access is blocked")`. Apply the same
+  change to the connect_ex test for consistency. That test is already meaningful,
+  because without the guard connect_ex returns an errno instead of raising, but the
+  tighter assertion is clearer. Optional, not required: add a short test that an AF_UNIX
+  socketpair or connect still works, so the carve-out the task asks for is covered
+  by a test. Everything else can stay as it is.'
+created: 2026-09-29T08:18:40+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0012
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Offline test harness: autouse socket guard and fixture-replay httpx transport,
+  split out of parked T-0011'
+why: The charter requires `uv run pytest -q` to be fully offline, with HTTP replayed
+  from tests/fixtures/**, and says a test that touches the network is a failing test.
+  The G1 fixture, engine and client tasks all need this harness. T-0011 bundled the
+  harness with the client and came back 'blocked' twice with no reason recorded. This
+  smaller piece contains only the harness, so it can land on its own.
+acceptance:
+- uv run pytest -q tests/test_harness.py
+- uv run pytest -q
+allowed_paths:
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: 2ecf71b
+merged_at: 2026-09-29T08:44:54+0200

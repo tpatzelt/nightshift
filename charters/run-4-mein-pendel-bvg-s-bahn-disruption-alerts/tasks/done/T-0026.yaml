@@ -1,0 +1,71 @@
+depends_on:
+- T-0025
+new_tests_required: true
+attempts: 1
+notes:
+- POST /me/delete (a form button, no JS) calls db.delete_user for the uid cookie's
+  user, deletes the cookie, and redirects with 303 to / with a DE/EN confirmation.
+  With no cookie or an unknown cookie it also redirects with 303 and deletes nothing.
+- Test with a tmp DB. Seed a user with a commute, a channels row and a notifications
+  row via SQL, plus a second user. After the POST, users/commutes/channels/notifications
+  have zero rows for the first user, the second user's rows are untouched, and the
+  response clears the uid cookie.
+- Reuse the DB dependency and cookie name exactly as T-0025 landed them. Read app.py
+  first. Every string gets DE and EN entries.
+- 'attempt 1: reviewer said revise: The route itself is correct. It uses the existing
+  get_db dependency, the ''uid'' cookie, db.user_exists and db.delete_user (which
+  cascades). It redirects with 303 in every case and clears the cookie with a matching
+  path. The cascade test is strong: it seeds users, commutes, channels and notifications
+  for two users, then checks row counts and which user survives. The no-cookie and
+  unknown-cookie tests are fine. Scope and DE/EN strings are OK. One thing needs fixing
+  before approval: test_home_shows_confirmation_in_german_and_english_after_delete
+  only asserts response_de.text != response_en.text. home_intro already differs between
+  languages (''Behalte deine Verbindung im Blick.'' vs ''Keep an eye on your commute.''),
+  so this test still passes if the {% if deleted %} block or the delete_me_done strings
+  are removed. It does not test the confirmation. Required fix: assert that ''Deine
+  Daten wurden gelöscht.'' appears in the DE response and ''Your data has been deleted.''
+  in the EN response (or compare against i18n.STRINGS[...][''delete_me_done'']). Also
+  assert that neither string appears on GET / without ?deleted=1. Optional, not blocking:
+  (1) the redirect always adds ?deleted=1, so a visitor with no cookie or an unknown
+  cookie sees ''Your data has been deleted'' even though nothing existed. Consider
+  redirecting to plain / in that case; the task only requires a 303. (2) The button-visibility
+  tests only check for the ''/me/delete'' path. Also asserting method="post" would
+  pin the no-JS form contract.'
+created: 2026-09-29T13:21:52+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0026
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Delete-my-data route: POST /me/delete removes every row for the cookie''s
+  user and clears the cookie'
+why: G2's definition of done lists delete-my-data as a served route with a TestClient
+  test. G5 also requires 'delete my data in one click'. db.delete_user already cascades,
+  but no web route exposes it.
+acceptance:
+- uv run pytest -q tests/test_web_delete.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/base.html
+- src/pendel/templates/index.html
+- tests/test_web_delete.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/db.py
+- src/pendel/migrations/**
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- src/pendel/notify/**
+- pyproject.toml
+- uv.lock
+rank: 5
+merged_sha: 8fd5cff
+merged_at: 2026-09-29T13:34:48+0200

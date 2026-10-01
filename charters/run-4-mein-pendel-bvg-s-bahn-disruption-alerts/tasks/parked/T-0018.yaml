@@ -1,0 +1,60 @@
+depends_on:
+- T-0004
+- T-0017
+new_tests_required: true
+attempts: 0
+notes:
+- Add a pytest.mark.parametrize table over the recorded files tests/fixtures/hafas/departures_undisturbed.json,
+  departures_cancellation.json, departures_delay.json, departures_construction.json,
+  departures_replacement_service.json and departures_warning.json. Build each row's
+  commute (origin stop, line, window) from the fixture's own data. Give each row the
+  expected verdict and a reason substring in both German and English.
+- Adjust engine.py only as far as these real fixtures need it, and keep the verdict
+  API from T-0004 stable. Keep the synthetic tests from T-0004 passing.
+- Add a test that asserts the recorded-fixture table covers at least five distinct
+  disruption kinds with affected=True, plus the undisturbed case with affected=False.
+- 'For each recorded disruption fixture, add a false-positive row: the same fixture
+  judged for a commute on a line not present in it gives affected=False.'
+- If any of the six fixtures is missing from the tree, report blocked and name it.
+  Do not create or edit recorded fixtures here.
+created: 2026-09-29T09:30:36+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0018
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Table-driven engine tests over all recorded departures fixtures: at least
+  five real kinds plus undisturbed'
+why: 'This completes G1''s definition of done: table-driven tests over recorded real
+  fixtures for at least five disruption kinds plus an undisturbed day, each with the
+  expected verdict and a DE/EN reason, and a false-positive test. T-0004 now tests
+  only on synthetic inputs, so this task adds every recorded fixture.'
+acceptance:
+- uv run pytest -q tests/test_engine.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine.py
+- tests/fixtures/hafas/engine/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/fixtures/hafas/departures_*.json
+- tests/fixtures/hafas/journeys_*.json
+- tests/fixtures/hafas/README.md
+- src/pendel/commute.py
+- src/pendel/hafas/**
+- src/pendel/alternatives.py
+- scripts/**
+- pyproject.toml
+- uv.lock
+rank: 7
+park_reason: Needs at least five recorded real disruption kinds (G1 definition of
+  done) from the parked recording chain T-0020/T-0016/T-0021/T-0022/T-0017. Synthetic
+  engine fixtures must never count as recorded real fixtures. Revive it once a human
+  settles live-recording access.

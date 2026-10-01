@@ -219,5 +219,30 @@ check("clip at 600 keeps the defect",
       "One defect remains: the h2 id is duplicated." in ns.clip(t14, 600), True)
 check("clip at 1500 keeps the whole verdict", ns.clip(t14, 1500), t14)
 
+print("\n--- an agent killed before it did anything is not an attempt ---")
+def raw(exit_code, result=None, max_turns=40):
+    r = ns.AgentResult("worker", "T-0039", Path("/tmp/x.jsonl"))
+    r.exit_code, r.result, r.max_turns = exit_code, result or {}, max_turns
+    return r
+check("SIGTERM with no result and no turns is interrupted (run 5 T-0039)",
+      raw(143).interrupted, True)
+check("an agent that never started (docker error) is interrupted", raw(125).interrupted, True)
+check("a worker that ran and failed is not interrupted",
+      raw(1, {"is_error": True, "num_turns": 12, "subtype": "error_during_execution"}).interrupted,
+      False)
+timed = raw(124)
+timed.timed_out = True
+check("a timeout is not interrupted: the task used its time", timed.interrupted, False)
+check("a clean exit is not interrupted", raw(0, {"num_turns": 3}).interrupted, False)
+
+print("\n--- running out of turns is named ---")
+maxed = raw(1, {"is_error": True, "num_turns": 41, "subtype": "error_max_turns"})
+check("subtype error_max_turns is a turn-limit stop", maxed.hit_max_turns, True)
+check("its stop reason says so", maxed.stop_reason(), "turn limit reached (41 turns, limit 40)")
+check("more turns than the limit counts without the subtype",
+      raw(1, {"is_error": True, "num_turns": 51}, max_turns=50).hit_max_turns, True)
+check("a normal run has no stop reason", raw(0, {"num_turns": 20}).stop_reason(), None)
+check("a timeout's stop reason", timed.stop_reason(), "timed out")
+
 print(f"\n{'ALL GOVERNOR TESTS PASSED' if not failures else 'FAILURES: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

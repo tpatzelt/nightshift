@@ -1,0 +1,50 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Create the plain-SQL file src/pendel/migrations/0002_commute_stop_names.sql: ALTER
+  TABLE commutes ADD COLUMN origin_name TEXT NOT NULL DEFAULT '''', and the same for
+  destination_name. Never edit 0001_initial.sql.'
+- 'Add `origin_name: str = ''''` and `destination_name: str = ''''` to Commute as
+  trailing fields with defaults, so every existing constructor call keeps working.'
+- db.add_commute writes both names and db.list_commutes reads them.
+- Add a migration test to tests/test_db.py. Build a DB by applying only 0001_initial.sql
+  (e.g. migrate() with a temp dir holding a copy of just that file) and insert a user,
+  a commute and a channel. Then open it with db.connect() and check that 0002 is applied,
+  the user, commute and channel rows are intact, and the new name columns are ''.
+- Do not touch scheduler.py or app.py in this task.
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0002
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: 'Migration 0002: store origin and destination stop names with each commute'
+why: G1 requires stop names to be stored with the commute, and G3 must show names
+  instead of IDs. The commutes table only has origin_stop_id and destination_stop_id.
+acceptance:
+- test -f src/pendel/migrations/0002_commute_stop_names.sql
+- uv run pytest -q tests/test_db.py tests/test_commute.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/db.py
+- src/pendel/commute.py
+- tests/test_db.py
+- tests/test_commute.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+merged_sha: 023a4b6
+merged_at: 2026-09-30T13:27:56+0200

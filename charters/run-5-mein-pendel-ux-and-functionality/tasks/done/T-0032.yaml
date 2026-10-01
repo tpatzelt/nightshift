@@ -1,0 +1,56 @@
+depends_on:
+- T-0020
+new_tests_required: true
+attempts: 0
+notes:
+- Add POST /commutes/{commute_id}/pause, /commutes/{commute_id}/resume and /commutes/{commute_id}/delete.
+  Each is scoped to the uid cookie's user via db.set_paused / db.delete_commute and
+  redirects 303 to /commutes. An unknown id, another user's id or a missing cookie
+  changes nothing (404 or a redirect is fine, but never touch another user's rows).
+- Parse the body with urllib.parse like POST /commutes does. python-multipart is not
+  a dependency.
+- 'On commutes.html, each commute gets plain <form method=post> buttons: ''Pausieren''/''Pause''
+  or ''Fortsetzen''/''Resume'', and ''Löschen''/''Delete''. Each button''s text or
+  aria-label names the commute (origin → destination) so screen readers can tell them
+  apart. No JavaScript is required.'
+- 'Tests: with three commutes, deleting one leaves the other two (in the DB and on
+  the page). Pause, then resume, flips the paused flag and the page''s Paused label.
+  Another user''s commute cannot be paused or deleted. DE+EN labels. Keep the 360px
+  layout test passing.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0032
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'My commutes: pause/resume and delete one commute via no-JS POST forms'
+why: 'G2: each saved commute can be paused/resumed and deleted individually. db.set_paused
+  and db.delete_commute exist (T-0007), but no route or button uses them.'
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/commutes.html
+- src/pendel/i18n.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 3
+merged_sha: 660400d
+merged_at: 2026-09-30T23:56:47+0200

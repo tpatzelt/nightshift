@@ -1,0 +1,12 @@
+# Initial backlog for charter G1-G5: three-screen setup, names and paused flag via new migrations, derived commute names
+
+_Recorded 20260930-131809 by the NIGHTSHIFT planner._
+
+## Context
+The backlog was empty. What /repo/mein-pendel does now: setup takes typed stop IDs and free-text lines across four screens. The commutes table has no names and no paused flag. /today prints raw stop IDs. Commute rejects windows that cross midnight. Recorded fixtures cover departures only: no /locations, no platforms, no journeys. Tracker messages carry only the reasons. The notifications page has no unlink and no test message. The stylesheet has hard-coded colors, and there is no manifest.
+
+## Decision
+Tasks follow the charter priority G1 > G3 > G2 > G5 > G4, overridden only by dependencies. The paused-flag migration (G2, T-0007) comes before the G3 today cards because G3's definition of done needs a paused card. Schema changes are two new migrations, 0002 (stop names) and 0003 (paused), each tested by upgrading a database built from the previous schema. Setup is three screens: /stops origin search, /stops destination search, and /commutes/new with line checkboxes and defaults. New real fixtures are recorded with few, small requests and trimmed to stay under max_diff_lines. Assumptions: (1) the charter defines no separate name field, so a commute's name is 'origin name → destination name'. (2) 'Next full half hour' rounds up to :00 or :30; until midnight-crossing windows land in T-0016, a default window that would cross midnight is clamped to 23:59. (3) Older commutes without stored names show a localized generic label, never IDs. (4) The notification link is PENDEL_PUBLIC_URL + '/today', or the bare path when that is unset, so no real domain enters the repo. (5) The existing 'not active today' state stays as an extra labelled status next to the four charter statuses. (6) 'Send test message' is per channel and is exercised only with FakeChannel.
+
+## Consequences
+25 small tasks across M1-M5 with explicit dependencies. T-0001, T-0009 and T-0011 need a few live HAFAS requests and report blocked on API errors; T-0011 may fall back to a labelled synthetic child-stop fixture. Every task protects pyproject.toml, uv.lock, deploy/, the Dockerfile, CI, migration 0001, the existing recordings and the legal pages. The new PENDEL_PUBLIC_URL variable is therefore reported as a followup rather than added to deploy/.pendel.env.example.

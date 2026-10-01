@@ -1,0 +1,92 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Read the uid cookie. If it is missing or unknown (db.user_exists), render a friendly
+  empty state with a link to /stops. Do not return an error. Get the commutes from
+  db.list_commutes(conn, uid) using the existing async get_db dependency pattern,
+  because sqlite3 rejects use across threads.
+- For each commute that is active today (Commute.is_active_on), fetch departures once
+  per origin stop through the shared get_hafas_client() under _hafas_lock. Run pendel.engine.evaluate
+  with delay_threshold_min=commute.delay_threshold_min and show reason_de or reason_en
+  for the resolved language. On HafasError, show a per-commute 'unavailable' message
+  and keep rendering the rest of the page with status 200. Do not fetch journeys on
+  this page.
+- Get 'now' from a small injectable dependency, for example get_now() returning dt.datetime.now(BERLIN),
+  so tests can override it via app.dependency_overrides. Tests also override get_hafas_client
+  with a HafasClient on an httpx.MockTransport serving labelled synthetic_today_*.json
+  fixtures, as in tests/test_web_stops.py.
+- 'Tests: an affected commute shows its reason in DE and in EN; an unaffected commute
+  shows the no-disruption text; no cookie shows the empty state; HafasError shows
+  the unavailable text; the page has viewport meta and no fixed width above 360px
+  (reuse the regex approach from tests/test_web_stops.py). Link /today from index.html.'
+- Add no JavaScript, no new dependencies and no live calls.
+- 'attempt 1: reviewer said revise: The route and tests match the task well. Blocking
+  issue: `today` is an `async def` route, but it calls the synchronous HAFAS client
+  directly on the event loop (src/pendel/app.py, the `with _hafas_lock: hafas_client.departures(...)`
+  block). That call does three things that block: (1) it makes a blocking httpx request
+  with a 10s timeout; (2) on a 429 or 503 it waits in `HafasClient._send_with_retry`,
+  which calls `time.sleep`, and 429s are expected on the public instance, which allows
+  about 100 requests a minute; (3) it waits on `_hafas_lock`, a `threading.Lock` that
+  the sync `/stops` route may already be holding in the threadpool. While the event
+  loop waits, the whole server stalls for every client, including `/healthz`, so the
+  G4 container healthcheck could fail during a slow or rate-limited HAFAS period.
+  Fix: keep `get_db` and all sqlite calls on the event-loop thread as the task requires.
+  Move only the HAFAS part (taking the lock and calling `departures`) off the loop,
+  e.g. with `await starlette.concurrency.run_in_threadpool(_fetch_departures, hafas_client,
+  stop_id, window_start, duration_minutes)`, where `_fetch_departures` is a small
+  sync helper that takes `_hafas_lock` and calls `hafas_client.departures`. The existing
+  tests should still pass. Optionally add a comment next to it saying why sqlite stays
+  on the loop thread and HAFAS does not. Minor, fix while you are in there: `departures_by_stop`
+  is typed `dict[str, object]`, but `evaluate` expects `dict[str, Any]`, so use `dict[str,
+  Any]`. Everything else is fine: the diff stays within allowed_paths; it adds no
+  JS, no dependencies and no journey fetches; the DE and EN reasons come from the
+  engine; a HafasError gives a per-commute unavailable message with status 200; the
+  empty state links to /stops; the inactive test proves HAFAS is not called; and the
+  affected and unaffected tests would fail if the route were reverted. Accepted assumptions:
+  stops are shown by their IDs, one departures fetch covers every commute from the
+  same origin stop, and inactive commutes get their own status.'
+created: 2026-09-29T17:58:07+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0028
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: '''Today on my route'' page: GET /today lists the cookie user''s commutes with
+  the engine verdict and reason (DE/EN, 360px)'
+why: G2's definition of done requires `uv run uvicorn pendel.app:app` to serve a 'today
+  on my route' page with a TestClient test and the 360px HTML-structure test. Stop
+  search, save commute and delete-my-data exist in src/pendel/app.py. 'Today on my
+  route' does not.
+acceptance:
+- uv run pytest -q tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/today.html
+- src/pendel/templates/index.html
+- tests/test_web_today.py
+- tests/fixtures/hafas/web/synthetic_today_*.json
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/alternatives.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- tests/fixtures/hafas/engine/**
+- tests/fixtures/hafas/harness/**
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: 91b2661
+merged_at: 2026-09-29T18:07:15+0200

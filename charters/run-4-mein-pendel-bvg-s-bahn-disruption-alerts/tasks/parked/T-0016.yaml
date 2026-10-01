@@ -1,0 +1,67 @@
+depends_on:
+- T-0020
+new_tests_required: true
+attempts: 0
+notes:
+- 'Live-call budget: at most 5 requests in total, at least 1 s apart. Report the exact
+  count.'
+- Extend the existing recorder and its --record mode. Do not change how the departures
+  fixtures are recorded, and do not edit those files.
+- 'Journeys: request results=3 or fewer between two real stops, for example with stopovers=false
+  and polylines=false. Keep ALL legs of each kept journey, trimmed per leg (origin
+  id/name, destination id/name, departure, plannedDeparture, arrival, line id/name/product,
+  cancelled, walking). The last leg of every kept journey must arrive at the requested
+  destination. Cut down by keeping fewer journeys, not fewer legs.'
+- 'Locations: one query such as ''Alexanderplatz'' with results=5, trimmed to id,
+  name, type and location.'
+- 'Add both files to the README with path, params, UTC time and ''verbatim-trimmed''.
+  Extend test_fixtures_shape.py: journeys has a ''journeys'' list, and each journey''s
+  last leg destination id equals the requested destination id recorded in the README
+  or the test. Locations is a non-empty list of stops with id and name.'
+- If network access is blocked, stop and report blocked with the exact command and
+  its error. Never work around the sandbox.
+created: 2026-09-29T09:30:36+0200
+max_diff_lines: 600
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0016
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record one real /journeys response (full legs, reaching the destination) and
+  one /locations response (part 2 of parked T-0002)
+why: G1 requires a suggested alternative connection when one exists. T-0005 needs
+  a real /journeys fixture that reaches the requested destination, which attempt 1
+  of T-0002 cut short. A real /locations response also fixes the stop-search shape
+  for G2.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/journeys_alternative.json
+- test -f tests/fixtures/hafas/locations_search.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/journeys_*.json
+- tests/fixtures/hafas/locations_*.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- tests/fixtures/hafas/departures_*.json
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: Blocked upstream. It depends on T-0020 (the live-recording probe), and
+  T-0020 was parked after 2 attempts that both came back 'blocked'. Before that, T-0002
+  and T-0015 were also blocked twice each. An earlier planner check was stopped by
+  the NIGHTSHIFT guard ('network tools are not available in the sandbox'). Live recording
+  does not work in this sandbox as it runs today. A human has to decide on network
+  access. Parked, not deleted, so it can be revived as is.

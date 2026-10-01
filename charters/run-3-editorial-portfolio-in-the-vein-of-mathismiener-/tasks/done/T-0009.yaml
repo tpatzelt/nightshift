@@ -1,0 +1,66 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- The script is the test for this task, so no separate test file is needed. The negative
+  acceptance commands copy the repo to a temp dir, break one rule, and expect the
+  script to fail.
+- Use `set -euo pipefail` and `cd "$(dirname "$0")/.."` so the script works from any
+  cwd, including a copy of the repo.
+- Use bash and python3 standard library only. No ruby, jekyll, PyYAML, npm or network
+  access.
+- 'Checks: (1) index.html, _layouts/default.html, _config.yml, assets/css/style.css
+  and assets/cv.pdf exist; (2) there is no package.json at the repo root; (3) _config.yml
+  has no top-level `plugins:` or `gems:` key; (4) no `<script src=` pointing to http(s)
+  or protocol-relative `//` URLs in index.html, _layouts/*.html or _includes/*.html
+  (if present); (5) exactly one `<h1` across index.html, _layouts/*.html and _includes/*.html;
+  (6) in each of those files, {% for %}/{% endfor %}, {% if %}/{% endif %}, {% unless
+  %}/{% endunless %} and {% case %}/{% endcase %} counts balance; (7) every `''/path''
+  | relative_url` reference in those files points to a file that exists; (8) every
+  _data/*.yml file (if any) is non-empty and contains no tab characters.'
+- 'Print one line per failed check and exit non-zero if any check fails. Print `check-site:
+  OK` on success.'
+- It must pass on the current tree. Do not edit any site file to make it pass. If
+  the current tree fails a check, drop that check and say so in your summary.
+- Later tasks may add checks to this script. Checks must never be removed or weakened.
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0009
+project: tpatzelt.github.io
+charter_goal: G1
+roadmap_ref: M1
+title: Create scripts/check-site.sh, the static site gate the charter requires (it
+  does not exist yet)
+why: The charter requires `bash scripts/check-site.sh` to stay green, and G1's definition
+  of done depends on it, but the script is missing from the repo, so no task can currently
+  pass its gate. The sandbox has bash and python3 (stdlib only, no PyYAML), plus node
+  and git. It has no ruby, bundler or jekyll, so the gate has to be a static check
+  of the source that uses only these tools.
+acceptance:
+- test -f scripts/check-site.sh
+- bash scripts/check-site.sh
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "<h1>x</h1>" >> "$d/index.html"; ! bash
+  "$d/scripts/check-site.sh"'
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "{}" > "$d/package.json"; ! bash "$d/scripts/check-site.sh"'
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "<script src=\"https://cdn.example.com/x.js\"></script>"
+  >> "$d/index.html"; ! bash "$d/scripts/check-site.sh"'
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; echo "{% if x %}" >> "$d/index.html"; ! bash
+  "$d/scripts/check-site.sh"'
+allowed_paths:
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- index.html
+- _layouts/**
+- assets/**
+rank: 0
+merged_sha: c5766e0
+merged_at: 2026-09-25T11:02:52+0200

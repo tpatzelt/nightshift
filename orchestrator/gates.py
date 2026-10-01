@@ -18,13 +18,15 @@ TEST_PATH_RE = re.compile(r"(^|/)(tests?|spec)/|(^|/)test_[^/]+\.py$|"
                           r"[^/]+_test\.(py|go|js|ts)$|\.(test|spec)\.(js|ts|tsx)$|"
                           r"(^|/)scripts/check-[^/]+\.sh$")
 
+OR_TRUE = re.compile(r"^\+.*\|\|\s*true\b")
+
 # Ways a diff can make the suite lie about itself.
 WEAKENING_RULES = [
     (re.compile(r"^\+.*@pytest\.mark\.(skip|xfail)"), "adds a pytest skip/xfail marker"),
     (re.compile(r"^\+.*\bunittest\.skip\b"), "adds a unittest skip"),
     (re.compile(r"^\+.*\b(it|test|describe)\.(skip|todo)\b"), "skips a JS test"),
     (re.compile(r"^\+.*\bt\.Skip\("), "skips a Go test"),
-    (re.compile(r"^\+.*\|\|\s*true\b"), "appends '|| true' to a command"),
+    (OR_TRUE, "appends '|| true' to a command"),
     (re.compile(r"^\+.*--exitfirst.*--no-header.*-x\b"), "narrows the test run"),
     (re.compile(r"^\+.*\bcontinue-on-error:\s*true"), "makes CI ignore failures"),
     (re.compile(r"^\+.*\bassert\s+True\s*$"), "adds a tautological assertion"),
@@ -43,6 +45,18 @@ SECRET_RULES = [
     (re.compile(r"(?i)\b(password|passwd|secret|api[_-]?key|token)\s*[:=]\s*"
                 r"['\"][^'\"\s]{12,}['\"]"), "hard-coded credential"),
 ]
+
+
+# A Python string literal on one line. In a .py file, '|| true' inside one is a
+# test asserting its absence (run 4's T-0040 parked on exactly that), not a
+# command; in a shell script, YAML or Dockerfile a quoted '|| true' still runs.
+PY_STRING_RE = re.compile(r"""(?:[rbfu]{0,2})("([^"\\]|\\.)*"|'([^'\\]|\\.)*')""", re.I)
+
+
+def weakening_hit(pattern: re.Pattern, line: str, path: str) -> bool:
+    if pattern is OR_TRUE and path.endswith(".py"):
+        return bool(pattern.search(PY_STRING_RE.sub('""', line)))
+    return bool(pattern.search(line))
 
 
 @dataclass
@@ -99,7 +113,7 @@ def path_protected(path: str, protected: list[str]) -> bool:
 
 
 def run_gates(task: dict, work: Path, base: str, worker_json: dict | None,
-              run_in_sandbox) -> GateResult:
+              run_in_sandbox, worker_stopped: str | None = None) -> GateResult:
     """Static gates 1-7 here; 8-9 execute in a jailed container via run_in_sandbox."""
     res = GateResult()
     tid = task["id"]
@@ -107,7 +121,11 @@ def run_gates(task: dict, work: Path, base: str, worker_json: dict | None,
     # 1. the worker's own verdict
     status = (worker_json or {}).get("status")
     if status != "done":
-        res.fail(f"worker reported status={status!r}, not 'done'")
+        # "status=None" read the same whether the worker ran out of turns or was
+        # killed, and the planner had to guess which; say so when the loop knows.
+        res.fail(f"worker stopped before reporting: {worker_stopped}"
+                 if worker_stopped and status is None
+                 else f"worker reported status={status!r}, not 'done'")
         res.details["worker_summary"] = (worker_json or {}).get("summary", "")
         return res  # nothing else is worth checking
 
@@ -146,9 +164,13 @@ def run_gates(task: dict, work: Path, base: str, worker_json: dict | None,
         code, path = parts[0], parts[-1]
         if TEST_PATH_RE.search(path) and code.startswith(("D", "R")):
             res.fail(f"test file {path} was {'deleted' if code.startswith('D') else 'renamed'}")
+    current = ""
     for line in diff.splitlines():
+        if line.startswith("+++ "):
+            current = line[4:].removeprefix("b/")
+            continue
         for pattern, why in WEAKENING_RULES:
-            if pattern.search(line):
+            if weakening_hit(pattern, line, current):
                 res.fail(f"diff {why}: {line.strip()[:90]}")
 
     # 6. new behaviour needs new tests

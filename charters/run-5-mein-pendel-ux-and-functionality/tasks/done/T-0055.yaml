@@ -1,0 +1,60 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Test-only task: add tests to tests/test_web_a11y.py and do not edit any template
+  or src file. If a page turns out to have an unlabelled visible control, do not fix
+  it here. Mark that one case pytest.mark.xfail with a reason that names the template
+  and the control, and report it as a followup.'
+- Parse the HTML with the stdlib html.parser.HTMLParser. Do not add a dependency.
+  A control is visible if it is input, select or textarea, and an input counts only
+  when its type is not hidden, submit or button. A control is labelled if it has an
+  id that some <label for=...> on the page references, or if it sits inside an open
+  <label> element.
+- 'Pages to cover, each with ?lang=de and ?lang=en: GET /stops; GET /stops?q=Alexanderplatz
+  with get_hafas_client overridden by a client that returns tests/fixtures/hafas/recorded/locations_alexanderplatz.json;
+  GET /commutes/new with origin_stop_id=900100003, origin_name, destination_stop_id=900120003
+  and destination_name, with get_hafas_client overridden by the existing _undisturbed_hafas_client
+  helper (see test_commutes_new_invalid_window_has_role_alert for get_now and the
+  form values); the edit page of a commute you save first via POST /commutes, following
+  the existing edit route (look at tests/test_web_commutes.py for the URL and how
+  the cookie is set); and GET /notifications with a seeded uid cookie (use _seed_user).'
+- Check how HafasClient.locations calls the API in src/pendel/hafas/client.py before
+  you build the MockTransport for the locations fixture. The existing autouse fixtures
+  _data_dir and _clear_overrides already isolate each test. Everything must stay offline.
+- Also assert that each page has at least one checked control, so the test can't pass
+  vacuously on an empty page. On /commutes/new and the edit page, also assert the
+  checkbox groups sit in a <fieldset> with a non-empty <legend>.
+created: 2026-10-01T06:00:45+0200
+max_diff_lines: 200
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0055
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M8
+title: 'A11y test: every visible form control on the setup, edit and notifications
+  pages has an associated label, in DE and EN'
+why: G4 requires an accessible design, and 'accessibility' and 'tests' are allowed
+  idle work. The forms in commute_new.html, stops.html and notifications.html are
+  labelled today, through <label for> or a wrapping <label> inside a fieldset with
+  a legend. No test guards this, so a later template edit could leave a checkbox or
+  a time input without a label and nothing would catch it. This task only adds a test.
+  It adds no feature.
+acceptance:
+- uv run pytest -q tests/test_web_a11y.py
+- uv run pytest -q
+allowed_paths:
+- tests/test_web_a11y.py
+protected_paths:
+- src/**
+- tests/fixtures/**
+- tests/conftest.py
+- pyproject.toml
+- uv.lock
+- README.md
+- deploy/**
+- docs/**
+merged_sha: 00fc3dd
+merged_at: 2026-10-01T06:06:05+0200

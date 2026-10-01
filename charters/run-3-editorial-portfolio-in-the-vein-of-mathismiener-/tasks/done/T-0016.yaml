@@ -1,0 +1,51 @@
+depends_on:
+- T-0015
+new_tests_required: false
+attempts: 0
+notes:
+- 'Heading check (python3 stdlib): strip Liquid tags from index.html and read the
+  <h1>..<h6> levels in source order. The first heading must be h1, and no heading
+  may go more than one level deeper than the one before it.'
+- 'Focus check: style.css must contain a :focus-visible rule covering at least a,
+  button and summary that sets a visible outline (not `outline: none`).'
+- 'Reduced-motion check: style.css must contain a `@media (prefers-reduced-motion:
+  reduce)` block that sets transition and animation to none (or 0s) and scroll-behavior
+  to auto for all elements. If any smooth scrolling is added, gate it behind `prefers-reduced-motion:
+  no-preference`.'
+- Add checks only; never remove existing ones. Fix the CSS or markup so the gate passes.
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0016
+project: tpatzelt.github.io
+charter_goal: G3
+roadmap_ref: M3
+title: Add heading-order, focus-style and reduced-motion checks to check-site.sh,
+  and fix what they flag
+why: 'G3''s definition of done requires correct heading order with exactly one <h1>,
+  a visible focus style on every interactive element, and prefers-reduced-motion:
+  reduce disabling every transition and scroll effect the page adds. Adding these
+  to the gate keeps them from regressing.'
+acceptance:
+- bash scripts/check-site.sh
+- bash -c 'd=$(mktemp -d); cp -r . "$d"; sed -i "0,/<h2/s//<h4/" "$d/index.html";
+  ! bash "$d/scripts/check-site.sh"'
+- 'grep -q ''prefers-reduced-motion: reduce'' assets/css/style.css'
+- grep -q ':focus-visible' assets/css/style.css
+allowed_paths:
+- scripts/check-site.sh
+- assets/css/style.css
+- index.html
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+rank: 2
+merged_sha: 6b8750f
+merged_at: 2026-09-25T21:25:24+0200

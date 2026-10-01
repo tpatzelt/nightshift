@@ -1,0 +1,145 @@
+depends_on:
+- T-0033
+new_tests_required: true
+attempts: 2
+notes:
+- Add GET /impressum, /datenschutz and /about, rendered through base.html with the
+  same language handling as '/'.
+- Use clearly marked placeholders only, such as [NAME], [ADRESSE], [E-MAIL] and a
+  Ko-fi link to https://ko-fi.com/[PLACEHOLDER]. No real names, addresses, domains
+  or emails (charter constraint).
+- 'Datenschutz must describe the actual data model truthfully: an opaque uid cookie,
+  saved commutes, optional Telegram chat id / ntfy topic, notification state, no email
+  or name, no trackers, a lang cookie, one-click delete via POST /me/delete, and that
+  stop and departure queries go to the VBB/BVG HAFAS REST API. Read the migration
+  and app.py for this; invent nothing.'
+- About says the app is free, has no ads and no tracking, and links the optional Ko-fi
+  placeholder.
+- The footer in base.html links all three pages on every page.
+- 'Tests with TestClient: each route returns 200 in DE and EN; the placeholders are
+  present; the footer on ''/'' , ''/today'' and ''/stops'' contains links to /impressum,
+  /datenschutz and /about; each page has viewport meta and no fixed width above 360px
+  (reuse the existing pattern).'
+- 'attempt 1: reviewer said revise: Scope is right: the diff touches only allowed
+  paths, uses bracketed placeholders only, and the footer links appear on every page
+  through base.html. Language handling matches ''/''. The tests would fail if the
+  change were reverted: the footer-link, placeholder and route tests all depend on
+  the new code. Most of the Datenschutz text matches migrations/0001_initial.sql and
+  app.py: uid cookie, commutes, channels, notification state, lang cookie, and delete
+  via POST /me/delete on the home page (index.html). Three things need fixing before
+  approval.
+
+
+  (1) The legal citation is wrong. The TMG was replaced by the Digitale-Dienste-Gesetz
+  in May 2024, so ''Angaben gemäß § 5 TMG'' is out of date for a launch-ready Impressum.
+  Change impressum_law_notice to ''§ 5 DDG'' in DE, and to ''Information according
+  to § 5 DDG (German Digital Services Act)'' in EN.
+
+
+  (2) The Datenschutz page leaves out two things the app actually does with personal
+  data, so it is not fully truthful. (a) The per-IP rate limiter from T-0033 processes
+  the client IP address (app.py:75-79, keyed on request.client.host) in process memory.
+  Add one sentence saying this is kept only in memory, for a short window, to prevent
+  abuse. Check pendel/ratelimit.py for the exact retention and do not invent any.
+  (b) If you set up notifications, the notification content is delivered through the
+  third-party services Telegram and/or the ntfy server you chose. Add one sentence
+  saying this. Add both sentences in DE and EN.
+
+
+  (3) Tests: the EN placeholder ''[ADDRESS]'' is never checked. Assert the Impressum
+  placeholders in EN as well, or use ''[ADRESSE]'' in both languages so there is one
+  placeholder for Tim to find. Add assertions for the new DDG, IP-address and Telegram/ntfy
+  sentences.
+
+
+  Optional: the three route handlers are copies of each other. A small helper such
+  as _render_static(request, template) would cut about 30 lines. This is not blocking.'
+- 'attempt 2: reviewer said revise: Most of the attempt-1 feedback is fixed. The Impressum
+  now cites § 5 DDG in DE and EN. [ADRESSE] is used in both languages and tested.
+  The two sentences about Telegram/ntfy as third parties are in place. The shared
+  _render_static_page helper was a good call. Scope is clean, and the footer, placeholder
+  and route tests would fail if the change were reverted. The remaining problem is
+  the new IP sentence (datenschutz_ip, DE and EN). It makes two claims that the code
+  does not back up, and the attempt-1 notes asked for exactly this check: ''Check
+  pendel/ratelimit.py for the exact retention and do not invent any.''
+
+
+  (1) Retention is wrong. RateLimiter.check (ratelimit.py:93-108) keeps key -> (window_start,
+  count) in an OrderedDict. It only resets an entry when the same IP comes back after
+  60 s. It never removes stale entries. An entry leaves memory only when LRU eviction
+  kicks in past _MAX_TRACKED_KEYS=10_000 keys, or when the process restarts. So on
+  a small instance an IP can stay in memory indefinitely, not ''for the current one-minute
+  window''. Suggested fix: describe it truthfully, e.g. DE ''ausschließlich im Arbeitsspeicher
+  des Servers, zusammen mit einem Anfragezähler; sie wird nicht in der Datenbank gespeichert
+  und geht spätestens bei einem Neustart des Servers verloren'', and the same in EN.
+  Do not change ratelimit.py in this task (it is not in allowed_paths).
+
+
+  (2) ''never … logged'' / ''nicht … protokolliert'' is false as deployed. The Dockerfile
+  CMD (line 37) runs uvicorn without --no-access-log. Uvicorn''s default access log
+  writes the client address for every request. Today that is Caddy''s IP, but it becomes
+  the visitor''s real IP once the proxy-headers follow-up is applied, and Caddy may
+  log too. Either drop the ''not logged'' claim or restrict it to what the app itself
+  does (''not written to the app''s database''). Do not promise anything about logs
+  this task cannot control.
+
+
+  (3) Tests: update test_datenschutz_describes_ip_address_rate_limiting to match the
+  corrected wording. Also add an assertion that the EN text no longer contains ''never
+  stored in the database or logged'' (and the DE equivalent), so the false claim cannot
+  come back.
+
+
+  Everything else checked against migrations/0001_initial.sql and app.py is accurate:
+  the HttpOnly uid cookie set on the first save, the commute fields including delay_threshold_min,
+  the channels, the notifications state, the lang cookie, and /me/delete deleting
+  the uid cookie and cascading. Keep those as they are.'
+created: 2026-09-29T18:26:41+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0034
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: Impressum, Datenschutzerklärung and About pages with placeholders, linked in
+  the footer (DE/EN, 360px)
+why: G5's definition of done needs the legal pages to exist and be linked in the footer.
+  It also asks for an About page that says the app is free and links an optional Ko-fi
+  placeholder. base.html's footer has only the app name, and none of these routes
+  exist.
+acceptance:
+- uv run pytest -q tests/test_web_legal.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/base.html
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- src/pendel/templates/about.html
+- tests/test_web_legal.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/scheduler.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: 'reviewer said revise: Most of the attempt-1 feedback is fixed. The Impressum
+  now cites § 5 DDG in DE and EN. [ADRESSE] is used in both languages and tested.
+  The two sentences about Telegram/ntfy as third parties are in place. The shared
+  _render_static_page helper was a good call. Scope is clean, and the footer, placeholder
+  and route tests would fail if the change were reverted. The remaining problem is
+  the new IP sentence (datenschutz_ip, DE and EN). It makes two claims that the code
+  does not back up, and the attempt-1 notes asked for exactly this check: ''Check
+  pendel/ratelimit.py for the exac'

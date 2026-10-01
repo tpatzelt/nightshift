@@ -1,0 +1,76 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add role="alert" to each of the four existing <p class="error"> elements: stops.html,
+  commute_new.html and the two in notifications.html. Change nothing else in those
+  elements or their templates.'
+- In base.html, give the footer <nav> an aria-label from a new i18n key 'footer_nav_label'.
+  Add the key in BOTH the de and en tables, e.g. 'Fußzeilen-Navigation' / 'Footer
+  navigation'.
+- 'In style.css, add one small .error rule, e.g. a dark red color that keeps at least
+  4.5:1 contrast on #ffffff, such as #b00020. Use no fixed px widths: the 360px structure
+  tests must stay green.'
+- 'New tests go in tests/test_web_a11y.py. Use TestClient(app) without ''with'', as
+  the other web tests do. Set PENDEL_DATA_DIR to tmp_path via monkeypatch. Clear app.dependency_overrides
+  after each test. Cover: (a) GET /stops?q=Alexanderplatz with get_hafas_client overridden
+  by a failing fake (see _FailingHafasClient in tests/test_web_stops.py) returns 503,
+  and the body contains role="alert"; (b) POST /commutes with an invalid form (e.g.
+  window_end before window_start, see tests/test_web_commutes.py) returns 400 with
+  role="alert"; (c) POST /notifications/ntfy with an invalid topic for a cookie user
+  returns 400 with role="alert" (see tests/test_web_notifications.py for how a user
+  is created); (d) GET /?lang=de and GET /?lang=en each contain a footer nav aria-label
+  with the right language text; (e) a successful GET /stops without q contains no
+  role="alert".'
+- Do not touch app.py or any Python module other than i18n.py. Do not restyle or restructure
+  anything else. The whole change should be a handful of template lines, two i18n
+  entries, one CSS rule and the test file.
+- 'No network: the tests must be fully offline. The conftest socket guard stays as
+  it is.'
+created: 2026-09-30T06:32:08+0200
+max_diff_lines: 200
+timeout_min: 35
+max_turns: 45
+status: done
+id: T-0049
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Accessibility: announce form and service error messages to screen readers
+  (role="alert") and label the footer nav in DE/EN'
+why: G2 requires a small mobile-first DE/EN web app. Four error paragraphs (stops.html:21
+  for stop search being unavailable, commute_new.html:8 for an invalid commute, and
+  notifications.html:23 and :37 for Telegram being unavailable and an invalid ntfy
+  topic) are plain <p class="error"> elements, so screen readers do not announce them
+  after a failed submit. base.html's footer <nav> has no accessible name. The .error
+  class has no style in style.css either, so an error looks like body text. This is
+  an accessibility fix strictly within G2, so it counts as allowed idle work and adds
+  nothing new.
+acceptance:
+- uv run pytest -q tests/test_web_a11y.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/templates/base.html
+- src/pendel/templates/stops.html
+- src/pendel/templates/commute_new.html
+- src/pendel/templates/notifications.html
+- src/pendel/i18n.py
+- src/pendel/static/css/style.css
+- tests/test_web_a11y.py
+protected_paths:
+- src/pendel/app.py
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/db.py
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- src/pendel/notify/**
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- Dockerfile
+- .github/**
+- pyproject.toml
+- uv.lock
+merged_sha: 1c4d1ee
+merged_at: 2026-09-30T06:34:13+0200

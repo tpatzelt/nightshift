@@ -1,0 +1,64 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- This replaces parked T-0001. No earlier attempt was merged, so start from the current
+  tree. The notes below restate the full requirements.
+- Use httpx only. Do not add dependencies.
+- 'API: locations(query), departures(stop_id, when, duration), journeys(from_id, to_id,
+  departure), trip(trip_id). Read the base URL from env PENDEL_HAFAS_BASE_URL, default
+  https://v6.bvg.transport.rest. Inject the httpx client.'
+- Cache is keyed by path plus sorted params. Its TTL uses an injected clock (a monotonic
+  callable), so tests never sleep.
+- 'The cache MUST be bounded. Evict expired entries on insert and cap the cache at
+  max_entries (default 256), dropping the oldest entry first. Test: 1000 departures
+  calls with distinct `when` values leave len(cache) <= max_entries.'
+- 'Test: after the TTL passes, an entry is refetched and the stale entry is gone from
+  the cache.'
+- Backoff on 429/503 uses an injected sleep, exponential delays (0.5, 1, 2 s) and
+  at most 3 retries. Honour a numeric Retry-After header, capped at 10 s. After the
+  last retry, raise a typed HafasError. Other 4xx/5xx raise at once with no retry.
+- 'Harness: an httpx.MockTransport that maps request paths to JSON files under tests/fixtures/hafas/.
+  Tiny hand-made JSON is fine here. Real recordings come in T-0002.'
+- tests/conftest.py gets an autouse guard that fails any real socket connect. Add
+  a test that proves the guard fires.
+- Make no live network calls in this task.
+created: 2026-09-29T08:15:57+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0011
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: HAFAS REST client with bounded TTL cache, 429/503 backoff and offline fixture-replay
+  harness (replaces parked T-0001)
+why: G1's engine needs departures, remarks and journeys from v6.bvg.transport.rest.
+  The charter says production code must cache and back off because the public instance
+  allows about 100 req/min, and that tests must be fully offline, replaying HTTP from
+  tests/fixtures/**. T-0001 was parked after two review rounds because the review
+  notes were cut off, so the required fixes never reached the worker. The repo still
+  has only a package stub (src/pendel/__init__.py).
+acceptance:
+- uv sync
+- uv run pytest -q tests/test_hafas_client.py
+- uv run pytest -q
+- uv run python -c "import pendel.hafas"
+allowed_paths:
+- src/pendel/hafas/**
+- tests/test_hafas_client.py
+- tests/conftest.py
+- tests/fixtures/hafas/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- pyproject.toml
+- uv.lock
+rank: 0
+park_reason: Superseded. The 20260929-081840 ADR split it into T-0012 (offline harness)
+  and T-0013 (HAFAS client), but T-0011 was still in the backlog as ready at rank
+  0. It edits the same paths as both of them (tests/conftest.py, src/pendel/hafas/**),
+  so running it would duplicate their work and conflict with it. Parked, not deleted,
+  because task IDs are never reused.

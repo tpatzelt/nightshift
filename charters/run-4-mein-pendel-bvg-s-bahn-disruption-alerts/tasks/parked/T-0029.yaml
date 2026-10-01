@@ -1,0 +1,137 @@
+depends_on:
+- T-0028
+new_tests_required: true
+attempts: 2
+notes:
+- Build a fixed-window or token-bucket limiter keyed by client IP (request.client.host),
+  with limit and window configurable via env PENDEL_RATE_LIMIT_PER_MIN (default 60),
+  validated at startup. Keep a bounded in-memory store that evicts stale IPs, and
+  make it thread-safe with a lock. Use stdlib only; add no dependency.
+- Exempt /healthz and /static/ so the G4 container healthcheck is never throttled.
+  A 429 response carries a Retry-After header.
+- Do not trust X-Forwarded-For by default; the proxy setup is G4's concern. Record
+  that assumption in the module docstring.
+- 'Tests use an injected clock and a small limit. Assert: requests up to the limit
+  get 200; the next one gets 429 with Retry-After; a different IP is unaffected; the
+  limit resets after the window; /healthz is never limited. Existing tests must stay
+  green, so make sure the default limit does not trip them. Resetting the limiter
+  per test through a fixture inside tests/test_ratelimit.py is fine.'
+- 'attempt 1: reviewer said revise: The limiter itself is sound: stdlib only, a lock,
+  a bounded LRU store, an injected clock, validation at startup, Retry-After on 429,
+  X-Forwarded-For not trusted and the reason documented, /healthz and /static/ exempt.
+  Two problems need fixing before approval.
+
+
+  (1) The existing tests are only just under the default limit. I checked by running
+  the full suite with PENDEL_RATE_LIMIT_PER_MIN set to lower values, without changing
+  any files. It passes at 50 and fails at 45. So the other test files already send
+  roughly 46–50 rate-limited requests, all from the same ''testclient'' key against
+  the shared app-wide limiter, which uses the real clock. That leaves about 10–14
+  requests of headroom under the default of 60. The next few G2/G5 tasks (legal pages,
+  footer links, the 360px HTML-structure tests) will start getting 429s that seem
+  to come from nowhere and have nothing to do with those tasks. The task said to make
+  sure the default limit does not trip existing tests; being this close to the limit
+  does not meet that intent. Fix this inside the allowed paths, and do not raise the
+  production default. For example: have the middleware skip limiting when app.state.rate_limiter
+  is None, and add an autouse fixture in tests/test_ratelimit.py only if it is scoped
+  correctly. Another option is to build app.state.rate_limiter in app.py from an explicit
+  setting that tests can override, and document how a test opts out. The requirement
+  is that the test suite''s behaviour cannot depend on how many HTTP requests other
+  test files make.
+
+
+  (2) The HTTP-level test test_requests_up_to_the_limit_get_200 only calls /healthz,
+  which is exempt. It would still pass with the middleware removed, so it proves nothing
+  about ''requests up to the limit get 200''. Change it to hit a limited route such
+  as ''/'' exactly `limit` times and assert 200 on each. In test_next_request_past_the_limit_gets_429_with_retry_after
+  and test_a_different_ip_is_unaffected, also assert 200 on the requests before the
+  limit instead of discarding their responses.
+
+
+  Minor, optional: the small_limit fixture is a generator annotated with a return
+  type of tuple, so annotate it as Iterator[...]. The unused monkeypatch parameter
+  in that fixture can be removed. The exemption prefix ''/healthz'' also matches paths
+  like ''/healthzX''; consider matching path == ''/healthz'' exactly or path.startswith(''/static/'').
+  Assumption recorded: fixed-window meets the ''fixed-window or token-bucket'' note,
+  and evicting the least-recently-used entry when the store is full meets ''evicts
+  stale IPs''.'
+- 'attempt 2: reviewer said revise: Both findings from attempt 1 are fixed. The HTTP
+  tests now send requests to the limited route ''/'' and assert 200 before the limit.
+  Bare TestClient(app) does not run the lifespan, so the other test modules no longer
+  count against the limiter. The limiter is still sound: stdlib only, a lock, a bounded
+  LRU store, an injected clock, Retry-After on 429, X-Forwarded-For not trusted and
+  documented, and exact matching for /healthz. Two problems remain.
+
+
+  (1) The production wiring is untested. The only code that turns rate limiting on
+  in production is _lifespan, which reads PENDEL_RATE_LIMIT_PER_MIN, validates it
+  and sets app.state.rate_limiter. No automated test runs it; the worker''s followups
+  say it was only checked by hand. If you delete the lifespan, or the `lifespan=`
+  argument to FastAPI(), all 181 tests still pass and the deployed app has no rate
+  limiting at all. G5''s definition of done is that rate limiting returns 429 past
+  the limit, tested, so the tests must cover the real startup path. Fix: add a test
+  in tests/test_ratelimit.py that sets PENDEL_RATE_LIMIT_PER_MIN to a small value
+  such as 2 with monkeypatch, opens `with TestClient(app) as c:`, and asserts 200,
+  200, then 429 with Retry-After on ''/''. Also add a test that an invalid env value
+  makes `with TestClient(app)` raise, to prove validation happens at startup.
+
+
+  (2) The lifespan leaks its limiter. _lifespan sets app.state.rate_limiter but never
+  resets it after `yield`. I checked this directly. `with TestClient(app): ...` leaves
+  the real 60-per-minute limiter on the module-global app after the block exits. It
+  uses the real clock and the shared ''testclient'' key. So the first test anywhere
+  that uses `with TestClient(app)`, including the test from (1) or a future G2/G4
+  lifespan test, will switch limiting on for every test module that runs after it.
+  That brings back exactly the order-dependent 429s from attempt 1. Fix: in _lifespan,
+  wrap the yield in try/finally and set app.state.rate_limiter = None after the yield.
+  The new lifespan test should also assert that app.state.rate_limiter is None after
+  the `with` block exits.
+
+
+  Everything else can stay as it is. Assumptions accepted: fixed-window meets the
+  ''fixed-window or token-bucket'' note, and evicting the least-recently-used key
+  meets ''evicts stale IPs''.'
+created: 2026-09-29T17:58:07+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0029
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: Per-IP rate limiting middleware returning 429 past the limit, stdlib only,
+  with an injected clock
+why: G5's definition of done requires that rate limiting returns 429 past the limit,
+  and that this is tested. src/pendel/app.py has no rate limiting today.
+acceptance:
+- uv run pytest -q tests/test_ratelimit.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/ratelimit.py
+- src/pendel/app.py
+- tests/test_ratelimit.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: 'reviewer said revise: Both findings from attempt 1 are fixed. The HTTP
+  tests now send requests to the limited route ''/'' and assert 200 before the limit.
+  Bare TestClient(app) does not run the lifespan, so the other test modules no longer
+  count against the limiter. The limiter is still sound: stdlib only, a lock, a bounded
+  LRU store, an injected clock, Retry-After on 429, X-Forwarded-For not trusted and
+  documented, and exact matching for /healthz. Two problems remain.
+
+
+  (1) The production wiring is untested. The only code that turns rate limiting on
+  in production is _lifespan, which reads PENDEL_'

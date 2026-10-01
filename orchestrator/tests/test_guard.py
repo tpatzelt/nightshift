@@ -26,6 +26,9 @@ CASES = [
     ("Edit", {"file_path": "/work/Makefile"}, 2),            # protected
     ("Edit", {"file_path": "/work/.github/workflows/ci.yml"}, 2),  # protected
     ("Write", {"file_path": "/work/.nightshift/TASK.md"}, 2),
+    ("Edit", {"file_path": "/work/.nightshift/TASK.md"}, 2),
+    ("Read", {"file_path": "/work/.nightshift/TASK.md"}, 0),  # the prompt says to read it
+    ("Read", {"file_path": "/work/.nightshift/guard.log"}, 2),
     ("Read", {"file_path": "/plan/CHARTER.md"}, 0),
     ("Read", {"file_path": "/work/src/foo.py"}, 0),
 ]

@@ -1,0 +1,54 @@
+depends_on:
+- T-0020
+new_tests_required: false
+attempts: 1
+notes:
+- scripts/check-site.sh is this repo's test file. Add a new numbered check (the next
+  free number after T-0020's step 11) that fails when _data/contact.yml is missing
+  or when index.html's Contact section does not loop over site.data.contact. Without
+  it the new_tests_required gate fails, as it did for T-0010 and T-0019.
+- Keep the values sourced from site.author.* (email, github, linkedin) and the '/assets/cv.pdf'
+  | relative_url reference. Do not change Tim's name, email or handles, and do not
+  copy them into the yml as new personal data. The yml should hold labels/kinds, and
+  the template should resolve the values from site.author.
+- Runs after T-0020 because both tasks edit index.html and scripts/check-site.sh.
+- "attempt 1: gate failures:\n  - scripts/check-site.sh is outside allowed_paths"
+created: 2026-09-25T11:00:44+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0015
+project: tpatzelt.github.io
+charter_goal: G2
+roadmap_ref: M2
+title: Render the Contact links from _data/contact.yml instead of hand-written markup
+why: G2 says 'anything list-shaped' should render from a data structure. The contact/social
+  links are a list, currently hand-written as repeated <a> blocks. The handles must
+  stay in _config.yml (the charter forbids changing them), so the data file only says
+  which links to show and in what order.
+acceptance:
+- bash scripts/check-site.sh
+- test -f _data/contact.yml
+- grep -q 'site.data.contact' index.html
+- grep -q 'site.author.email' index.html
+- grep -q 'site.author.github' index.html
+- grep -q 'site.author.linkedin' index.html
+- bash -c '! grep -Eq "tpatzelt|tim-patzelt|posteo" _data/contact.yml'
+- bash -c 'test $(grep -c "<a " index.html) -le 4'
+allowed_paths:
+- index.html
+- assets/css/style.css
+- _data/contact.yml
+protected_paths:
+- .github/**
+- assets/cv.pdf
+- _config.yml
+- Gemfile
+- Gemfile.lock
+- README.md
+- _layouts/**
+- assets/js/**
+rank: 1
+merged_sha: 007e17f
+merged_at: 2026-09-25T21:20:21+0200

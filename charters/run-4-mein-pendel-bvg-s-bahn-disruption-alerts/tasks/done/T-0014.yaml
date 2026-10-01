@@ -1,0 +1,65 @@
+depends_on:
+- T-0006
+- T-0024
+new_tests_required: true
+attempts: 1
+notes:
+- 'HARD RULE: never send any request to api.telegram.org or any other messaging service.
+  Do not create a bot token. Tests use only FakeChannel and hand-made update dicts.'
+- create_link(conn, user_id) -> URL. It stores a channels row (kind 'telegram', link_token
+  from secrets.token_urlsafe, target NULL) and returns https://t.me/<bot>?start=<token>.
+  The bot username comes from env PENDEL_TELEGRAM_BOT_USERNAME. If that is missing,
+  raise a clear configuration error.
+- 'handle_update(conn, update: dict, channel) takes a Telegram Update-shaped dict.
+  If message.text is ''/start <token>'' and the token matches an unlinked row, set
+  target=str(chat.id) and linked_at, clear link_token, and send exactly one confirmation
+  (DE+EN) to that chat through the injected channel.'
+- An unknown, already used or malformed token links nothing. At most one neutral reply
+  is sent, and it must not reveal whether the token exists. Tokens are single-use.
+- 'End-to-end test with a tmp DB and FakeChannel: create_link, then feed the /start
+  update, then check the row is linked and exactly one confirmation was sent. Replaying
+  the same update changes nothing and sends no second confirmation. A wrong token
+  leaves every row unlinked.'
+- Use the db API exactly as it landed in T-0006 and the notify API exactly as it landed
+  in T-0024 (which replaces parked T-0007). Read them first. Those files are protected
+  in this task.
+- "attempt 1: gate failures:\n  - diff appears to contain a hard-coded credential\n\
+  \  - diff appears to contain a hard-coded credential"
+created: 2026-09-29T08:33:24+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0014
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Telegram /start deep-link linking flow, tested end-to-end against a fake channel
+  and fake updates
+why: G3's definition of done requires the Telegram linking flow (link via a /start
+  deep-link token) to be tested end-to-end against a fake. No backlog task covers
+  it yet. The flow can be built as a pure module on top of the T-0006 channels table
+  and the T-0007 channel interface. The web route that shows the link is wired up
+  later under G2.
+acceptance:
+- uv run pytest -q tests/test_telegram_link.py
+- uv run pytest -q
+- uv run python -c "import pendel.telegram_link"
+allowed_paths:
+- src/pendel/telegram_link.py
+- tests/test_telegram_link.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/db.py
+- src/pendel/migrations/**
+- src/pendel/notify/**
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- pyproject.toml
+- uv.lock
+rank: 2
+merged_sha: ee8d5fb
+merged_at: 2026-09-29T13:56:05+0200

@@ -1,0 +1,107 @@
+depends_on:
+- T-0012
+new_tests_required: true
+attempts: 2
+notes:
+- 'Keep live calls small: at most about 30 requests for the whole task, with a sleep
+  of 1 second or more between them. Never loop.'
+- 'Targets: a cancellation (cancelled: true), a replacement bus / Ersatzverkehr (a
+  remark or line with SEV/Ersatzverkehr), a delay above a threshold (e.g. >= 10 minutes),
+  a construction/Bauarbeiten remark on a line (e.g. S-Bahn Ring S41/S42), a warning/status
+  remark, and an undisturbed departures response. Also record one /locations stop
+  search response and one /journeys response for alternatives.'
+- 'The recorder script must trim responses so the diff stays under 800 lines: keep
+  only a few departures per file and drop polylines and unused fields. Also write
+  the trimming logic into the script.'
+- 'tests/fixtures/hafas/README.md lists each fixture file with: request path+params,
+  UTC recording time, disruption kind, and whether it is verbatim-trimmed or derived.'
+- If a kind cannot be found live today, do not invent it from scratch. You may derive
+  it by minimally editing a real recorded response only if it is labelled 'derived'
+  in the README; otherwise leave it out and report the gap as a followup.
+- tests/test_fixtures_shape.py asserts that each fixture parses as JSON and has the
+  expected top-level keys (e.g. 'departures'). Tests must not touch the network.
+- 'attempt 1: reviewer said revise: All gates pass, the diff stays inside allowed_paths,
+  adds no new dependency and no secrets, and the tests run offline. It still falls
+  short of what the task and G1 need, for five reasons.
+
+
+  (1) departures_warning_status.json is not a warning or disruption. The remark it
+  matched is type=status, code text.realtime.journey.additional.service, text ''Additional
+  service''. That is an extra train, not a disruption, and the same remark also appears
+  in departures_delay.json. The matcher in scripts/record_fixtures.py (status remark
+  whose text does not contain ''cancel'') is too loose. Tighten it to a real warning,
+  for example type==''warning'' with disruption wording (Störung, Einschränkung, Umleitung,
+  Ausfall), or excluding additional-service and hint codes. If no real example exists
+  today, leave the fixture out and report the gap. As submitted, only 3 real disruption
+  kinds are verbatim (cancellation, delay, construction), not the 4 the worker claims.
+
+
+  (2) departures_replacement_bus.json is not a minimal or plausible derivation. It
+  starts from a cancelled bus (line 194), renames it ''SEV 194'' and adds a remark
+  saying ''Schienenersatzverkehr (SEV) mit Bus''. Schienenersatzverkehr means buses
+  replacing a rail line, so a replacement for a bus line is contradictory. The remark
+  code ''text.realtime.journey.replacement-service'' does not appear in any recorded
+  response, so it was invented. This goes beyond the ''minimally editing a real recorded
+  response'' allowance. Either derive it from a real rail departure (S-Bahn or U-Bahn),
+  change as few fields as possible and use only codes and wording seen in real responses,
+  or drop the fixture and report the gap as a followup.
+
+
+  (3) journeys_alternative.json is truncated so it no longer shows an alternative.
+  The script keeps legs[:2], so the journey ends at Warschauer Str. and never reaches
+  Alexanderplatz, and its second leg is a zero-length transfer or walk (origin ==
+  destination, line null). An alternative-connection fixture has to reach the requested
+  destination. Keep all legs of one journey, trimmed per leg, and cut down elsewhere
+  if needed to stay under the diff budget.
+
+
+  (4) Tests are missing for the kinds the task names. Nothing checks that departures_construction.json
+  contains a Bauarbeiten remark, that departures_replacement_bus.json contains SEV
+  or Ersatzverkehr, or that departures_warning_status.json contains a genuine warning
+  or disruption remark. A per-kind check would have caught issue (1). Minor: in test_readme_documents_every_fixture_file
+  the filter `p.name != "harness"` does nothing, because the glob only matches *.json
+  files in the top-level directory.
+
+
+  (5) The live-call budget can''t be verified. The worker reports about 14 requests
+  in the final run, but TARGETS has only 7 entries, so the script seems to have run
+  twice, plus scratch probes of ''10+ stations''. The total may be near or above the
+  roughly 30-request cap. Report the exact total count.
+
+
+  Assumption: I treated the task''s fallback rule strictly. A derived fixture must
+  be a small, faithful edit of a real response, and a remark that matched by keyword
+  but is not a disruption does not count as a real disruption kind.'
+- "attempt 2: gate failures:\n  - worker reported status='blocked', not 'done'"
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 800
+timeout_min: 60
+max_turns: 80
+status: parked
+id: T-0002
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record real VBB/BVG HAFAS fixtures for disruption kinds and an undisturbed
+  case
+why: The G1 definition of done needs recorded fixtures for at least five real disruption
+  kinds plus an undisturbed day. The sandbox may reach v6.bvg.transport.rest to learn
+  the real response shapes.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/README.md
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/**
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 2
+park_reason: "gate failures:\n  - worker reported status='blocked', not 'done'"

@@ -1,0 +1,69 @@
+depends_on:
+- T-0012
+new_tests_required: true
+attempts: 2
+notes:
+- 'Live-call budget: at most 3 requests to v6.bvg.transport.rest in total, at least
+  1 s apart, scratch probes included. Report the exact total in your final report.'
+- Make the first request a single GET /stops/<id>/departures with a short duration
+  (for example 20) and results of about 10. If it fails for any reason (guard, DNS,
+  timeout, HTTP error), stop at once. Report blocked and put the exact command and
+  its full error output on the first lines of the report. Never try other tools, proxies
+  or routes.
+- scripts/record_fixtures.py uses httpx, which is already a dependency. It makes HTTP
+  calls only with an explicit --record flag. --help and imports must never touch the
+  network. Add no dependencies.
+- Trim inside the script. Keep the first N departures in response order and drop unused
+  fields, but keep tripId, when, plannedWhen, delay, cancelled, line (id, name, product),
+  stop (id, name) and remarks (type, code, summary, text). Only trim; never rewrite
+  values, and never pick out or drop individual departures to make the file look clean.
+- 'Undisturbed means: no departure is cancelled, none has delay >= 300 s, and no remark
+  has type ''warning''. If a response does not meet this, you may use one of the remaining
+  requests on a quieter stop. If none of the 3 meets it, write no fixture and report
+  blocked with the stops you tried.'
+- tests/fixtures/hafas/README.md lists the file with its request path and params,
+  UTC recording time, kind 'undisturbed' and 'verbatim-trimmed'.
+- tests/test_fixtures_shape.py checks that every departures_*.json parses, has a 'departures'
+  list, and is listed in the README. It also checks that the undisturbed file meets
+  the definition above. Tests stay offline. Later tasks will extend this file.
+- "attempt 1: gate failures:\n  - worker reported status='blocked', not 'done'"
+- "attempt 2: gate failures:\n  - worker reported status='blocked', not 'done'"
+created: 2026-09-29T10:06:19+0200
+max_diff_lines: 300
+timeout_min: 30
+max_turns: 40
+status: parked
+id: T-0020
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record one real undisturbed departures fixture with the new recorder script
+  (at most 3 live requests)
+why: G1's definition of done needs recorded real fixtures, including an undisturbed
+  day. T-0015 (four kinds at once) came back blocked twice with no reason recorded.
+  This is the smallest possible recording slice. It creates the recorder, the fixture
+  README and the shape test for one file, so the next planner learns whether live
+  recording works at all and, if not, the exact error.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/README.md
+- test -f tests/fixtures/hafas/departures_undisturbed.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/departures_undisturbed.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 1
+park_reason: "gate failures:\n  - worker reported status='blocked', not 'done'"

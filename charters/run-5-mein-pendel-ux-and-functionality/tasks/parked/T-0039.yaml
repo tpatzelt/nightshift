@@ -1,0 +1,88 @@
+depends_on:
+- T-0038
+new_tests_required: true
+attempts: 2
+notes:
+- 'Add a get_channels() dependency in app.py that returns runner.build_channels(<shared
+  httpx client>, os.environ) (lru_cached like get_hafas_client). Tests must always
+  override it with {''telegram'': FakeChannel(), ''ntfy'': FakeChannel()} or a single
+  shared FakeChannel.'
+- POST /notifications/channels/{channel_id}/test sends exactly one localized test
+  message (DE+EN text, e.g. 'Testnachricht von Mein Pendel' / 'Test message from Mein
+  Pendel') to that linked channel only, then redirects 303 to /notifications?test=sent,
+  which shows a role=status confirmation. A pending channel (target NULL), a foreign
+  id or an unknown id sends nothing. ChannelSendError shows a role=alert error instead
+  of a 500.
+- 'Tests: exactly one message reaches the fake, with the right target. Nothing is
+  sent for a pending or foreign channel. A fake that raises ChannelSendError gives
+  the error alert. Never construct TelegramChannel or NtfyChannel in a test, and never
+  contact api.telegram.org or any ntfy server.'
+- 'attempt 1: reviewer said revise: The diff matches G5/M5 and the task notes. get_channels
+  is lru_cached and built from runner.build_channels(shared httpx.Client, os.environ).
+  The route checks ownership through db.list_channels, so pending, foreign, unknown
+  and cookie-less requests send nothing and redirect 303. On success it redirects
+  to /notifications?test=sent, which shows a role=status message. A ChannelSendError
+  renders a role=alert error with status 502, not a 500. New strings exist in DE and
+  EN. Only allowed paths are touched, no protected path changes, no new dependency.
+  Every test that sends overrides get_channels with FakeChannel or a raising fake.
+  No test builds a TelegramChannel or NtfyChannel or contacts Telegram or ntfy. The
+  tests would fail if the change were reverted: the route would not exist, and role=alert
+  only appears on this page when an error occurs.
+
+
+  One blocking issue. The new handler is `async def` but calls `channels[row[''kind'']].send(...)`
+  directly. In production that is a blocking httpx.Client request to Telegram or ntfy
+  with a 10 s timeout, running on the event loop. A slow or hanging Telegram or ntfy
+  response would freeze every other request in the process for up to 10 s. The rest
+  of app.py avoids this: blocking HTTP inside async routes goes through `run_in_threadpool`
+  (see the HAFAS calls around lines 162–226 and 929, and their docstrings). Fix: use
+  `await run_in_threadpool(channels[row[''kind'']].send, row[''target''], t(''notifications_test_message''))`,
+  or make the handler a plain `def`. Keep the ChannelSendError handling.
+
+
+  Optional, non-blocking:
+
+  1. The ChannelSendError test could also assert the localized error text (''Testnachricht
+  konnte nicht gesendet werden'') and that the raising fake was called exactly once.
+
+  2. The worker''s assumption of status 502 for the error page is acceptable.'
+- "attempt 2: gate failures:\n  - worker reported status=None, not 'done'"
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0039
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'Notifications page: ''send test message'' through an overridable channels
+  dependency'
+why: 'G5: the notifications page offers a ''send test message'' action. The web app
+  has no access to channels, and there is no such action.'
+acceptance:
+- uv run pytest -q tests/test_web_notifications.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/notifications.html
+- src/pendel/i18n.py
+- tests/test_web_notifications.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+- src/pendel/notify/**
+- src/pendel/runner.py
+rank: 4
+park_reason: "gate failures:\n  - worker reported status=None, not 'done'"

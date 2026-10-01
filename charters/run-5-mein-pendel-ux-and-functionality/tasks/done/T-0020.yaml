@@ -1,0 +1,89 @@
+depends_on:
+- T-0019
+new_tests_required: true
+attempts: 1
+notes:
+- 'GET /commutes renders commutes.html for the uid cookie''s user via db.list_commutes:
+  name ''origin_name → destination_name'' (the localized generic label from T-0012
+  when names are empty, never IDs), sorted lines, localized weekday names, the window
+  as HH:MM–HH:MM, and a text ''Pausiert'' / ''Paused'' label when paused. Without
+  a user, show the empty state with a link to /stops.'
+- Link to it from index.html. Leave the save redirect after POST /commutes as it is.
+- 'Tests: two commutes listed with names, lines, days and windows. Another user''s
+  commute is not shown. No 9-digit ID appears. DE+EN. The 360px layout check (viewport
+  meta, no wide fixed widths).'
+- 'attempt 1: reviewer said revise: The implementation looks correct and stays in
+  scope. GET /commutes sits alongside POST /commutes with no conflict. It uses db.list_commutes
+  scoped to the uid cookie and reuses _commute_title, so no stop IDs are shown. Weekday
+  names are localized, the window is HH:MM–HH:MM, the paused label comes from today_status_paused,
+  the empty state links to /stops, index.html links to the page, and there are DE
+  and EN strings. The tests fall short of the task notes in four places, and all four
+  are straightforward to fix in tests/test_web_commutes.py:
+
+
+  (1) Days are never checked. The task asks for ''two commutes listed with names,
+  lines, days and windows'', but test_commutes_page_lists_two_commutes_by_name_lines_days_and_window
+  has no assertion about weekdays. Deleting the weekday <p> from commutes.html would
+  leave every test green. Add assertions on the rendered weekday labels for both commutes.
+  The seeds use weekdays {0,2,4} and {5,6}, so check ''Mo, Mi, Fr'' and ''Sa, So''
+  in DE, and ''Mon, Wed, Fri'' and ''Sat, Sun'' with ?lang=en. That also checks the
+  sorted order.
+
+
+  (2) DE and EN are only tested for the paused label. Also assert the page heading
+  in each language (''Meine Verbindungen'' / ''My commutes''). Add the empty-state
+  text (''Du hast noch keine Verbindung gespeichert.'' / ''You have not saved a commute
+  yet.'') to the no-user and user-with-no-commutes tests. As written, those two tests
+  only check href="/stops", which the base layout or nav could satisfy on its own.
+
+
+  (3) Sorted lines are not checked. The first seed is frozenset({''S5'',''S3''}),
+  so assert that ''S3, S5'' appears in the page.
+
+
+  (4) The notes say the page should show ''the localized generic label from T-0012
+  when names are empty, never IDs''. No test seeds a commute with empty origin_name
+  and destination_name. Add one and assert that the generic label appears and that
+  the 9-digit regex does not match.
+
+
+  No code changes are needed beyond the tests.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0020
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: '"My commutes" page lists every saved commute'
+why: 'G2: a ''my commutes'' page lists every saved commute by name with its lines,
+  days and window. No such page exists.'
+acceptance:
+- test -f src/pendel/templates/commutes.html
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/commutes.html
+- src/pendel/templates/index.html
+- src/pendel/i18n.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 2
+merged_sha: f5e24ca
+merged_at: 2026-09-30T23:53:54+0200

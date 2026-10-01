@@ -1,0 +1,82 @@
+depends_on:
+- T-0010
+new_tests_required: true
+attempts: 1
+notes:
+- Add GET /stops with query param q to src/pendel/app.py. It calls HafasClient.locations(q)
+  through a dependency that tests can override. Render only entries with type 'stop'
+  or 'station' (id, name) as a plain HTML form/list with no JS. An empty or too-short
+  q (fewer than 2 characters) renders the form without calling HAFAS.
+- If HafasError is raised, render a friendly DE/EN message with status 200 or 503,
+  never a traceback.
+- Tests use FastAPI TestClient with the HafasClient built on the conftest hafas_replay
+  MockTransport. Use a hand-made, labelled fixture tests/fixtures/hafas/web/synthetic_locations.json
+  (a list shaped like the HAFAS v6 /locations response). Make no live calls; live
+  recording is blocked in this sandbox.
+- Reuse the T-0010 base template and i18n dict. Assert the viewport meta and no width:NNNpx
+  with NNN > 360 on the /stops page, in both ?lang=de and ?lang=en.
+- Keep existing routes unchanged. Do not restructure app.py beyond adding the route
+  and the dependency.
+- 'attempt 1: reviewer said revise: The diff is in scope, uses only allowed paths,
+  and the tests are real. The short-query tests actually prove HAFAS is not called:
+  with empty routes, the conftest handler raises LookupError, which is not an httpx.TransportError,
+  so any call would crash the TestClient request. Result filtering, the no-results
+  message, the DE/EN error text and the 360px checks are all exercised. One defect
+  blocks approval. (1) The HAFAS TTL cache never works in production. get_hafas_client()
+  builds a new HafasClient on every request, and the TTL cache lives on the HafasClient
+  instance, not on the shared httpx.Client. So every /stops request starts with an
+  empty cache, and repeated searches for the same query all go to v6.bvg.transport.rest.
+  That breaks the charter rule that production code must cache because of the ~100
+  req/min limit, and this is a public search page. The worker''s claim that the lru_cache''d
+  httpx.Client gives ''TTL-cache reuse'' is wrong. Fix: return one shared HafasClient
+  per process, e.g. put @lru_cache(maxsize=1) on the function that builds the HafasClient,
+  so tests can still override get_hafas_client. Because sync FastAPI endpoints run
+  in a threadpool and HafasClient mutates an OrderedDict without a lock, either document
+  that it is shared or add minimal locking in app code only. Do not edit src/pendel/hafas/**,
+  it is protected. Add a test that calls get_hafas_client() twice and asserts the
+  same instance comes back, or that two identical /stops queries through the app hit
+  the transport only once. (2) Optional hardening: add a HafasError test that goes
+  through the real HafasClient and the hafas_replay transport (e.g. a MockTransport
+  returning HTTP 500) instead of only the duck-typed _FailingHafasClient. That proves
+  real client errors map to the friendly 503 page. Reading protected files read-only
+  with cat for signatures was transparent and made no edits; that is acceptable. The
+  503 status choice is within the task.'
+created: 2026-09-29T12:51:18+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0023
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Stop search page: GET /stops?q= renders HAFAS /locations results server-side
+  (DE/EN, 360px)'
+why: G2's definition of done needs `uv run uvicorn pendel.app:app` to serve stop search,
+  with a TestClient test and the 360px HTML-structure checks. Visitors pick origin
+  and destination stops here before saving a commute.
+acceptance:
+- uv run pytest -q tests/test_web_stops.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/**
+- tests/test_web_stops.py
+- tests/fixtures/hafas/web/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/hafas/**
+- src/pendel/db.py
+- src/pendel/migrations/**
+- tests/fixtures/hafas/engine/**
+- tests/fixtures/hafas/harness/**
+- pyproject.toml
+- uv.lock
+rank: 7
+merged_sha: 16ae0e6
+merged_at: 2026-09-29T13:13:37+0200

@@ -1,0 +1,68 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Documentation only. Do not edit any file under src/. Do not reformat or reorder
+  existing README sections, and keep the Configuration table and the Tests and Deployment
+  sections as they are.
+- '1) README.md: in the ''Run locally'' code block, replace the comment ''# G2: the
+  web app (stop search, saved commutes, "today on my route")'' with ''# the web app''.
+  Replace both ''# G3: ...'' comments with plain descriptions that carry no goal number,
+  e.g. ''# the scheduler that checks due commutes and sends notifications'' and ''#
+  the Telegram getUpdates poller that links /start deep-link tokens''. In the Deployment
+  paragraph, remove ''(charter G4)''.'
+- '2) README.md: add a ''## Using Mein Pendel'' section after ''Run locally''. Keep
+  it to about 15 lines. Describe: the setup in at most three screens (search the origin
+  and destination by name on /stops, then on /commutes/new tick the lines that depart
+  from the origin; defaults are Mon–Fri, a 30-minute window from the next full half
+  hour and a 5-minute delay threshold; works without JavaScript); /commutes (lists
+  every commute, with edit, pause/resume and delete; windows may cross midnight);
+  /today (one card per commute with status OK / disrupted / paused / checking failed,
+  next departures with planned vs real-time time and platform, and the alternative);
+  /notifications (link Telegram or ntfy, unlink each one, send a test message). Use
+  no real domains, IPs, tokens or personal data.'
+- '3) tests/test_readme.py: add test_readme_documents_visitor_pages, which reads README.md
+  and asserts it contains each of ''/stops'', ''/commutes/new'', ''/commutes'', ''/today''
+  and ''/notifications''. Add test_readme_has_no_stale_goal_labels, which asserts
+  that re.search(r''\bG[1-5]\b'', readme) is None. The existing module docstring says
+  ''(charter G4)''. Leave it as it is, because it is a test file and not the README.'
+- Run uv run pytest -q at the end. All 481+ tests must stay green and offline.
+created: 2026-10-01T05:34:18+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0054
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M7
+title: 'README: document the guided setup and the other visitor pages, and fix stale
+  goal labels'
+why: 'G1 through G5 have met their definition of done, so only the charter''s allowed
+  idle work remains, and documentation is part of it. README.md still labels the web
+  app ''G2'' and the scheduler ''G3'', which are goal numbers from an earlier charter.
+  It also does not describe the visitor flow that G1 is about: search the origin and
+  destination by name, then tick lines from the origin''s departures, with no stop
+  ID or line name typed. The pages from G2, G3 and G5 are not described either. Without
+  this, an operator or contributor cannot tell from the README how a stranger sets
+  the app up in under a minute.'
+acceptance:
+- uv run pytest -q tests/test_readme.py
+- uv run pytest -q
+allowed_paths:
+- README.md
+- tests/test_readme.py
+protected_paths:
+- src/**
+- docs/CHARTER.md
+- src/pendel/migrations/**
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- Dockerfile
+- deploy/**
+- DEPLOY.md
+- pyproject.toml
+- uv.lock
+- tests/fixtures/**
+merged_sha: 03aa03f
+merged_at: 2026-10-01T05:35:58+0200

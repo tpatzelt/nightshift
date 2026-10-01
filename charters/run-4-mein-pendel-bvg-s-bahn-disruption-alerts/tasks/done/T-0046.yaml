@@ -1,0 +1,58 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- In Commute.__post_init__, raise ValueError when delay_threshold_min < 0 and when
+  window_end < window_start. Allow window_end == window_start (a single departure
+  time) and delay_threshold_min == 0. Do not add support for windows that cross midnight.
+- Add tests to tests/test_commute.py with names that contain 'negative_delay_threshold'
+  and 'window_end_before_window_start', and include boundary tests for threshold 0
+  and equal start/end.
+- In tests/test_web_commutes.py, add POST tests with names that contain 'negative_delay_threshold'
+  and 'window_end_before_window_start'. Each must assert status 400, that the response
+  contains '<form', and that the commutes table has 0 rows, following test_post_with_invalid_weekday_returns_400_and_inserts_no_row.
+  Include weekdays='0' in the form so the weekday check does not trigger instead.
+- app.py already catches ValueError around Commute(...) and must not change. No schema
+  change, no new fixture, no new dependency, no live HAFAS calls.
+created: 2026-09-30T05:18:03+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0046
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Commute rejects a negative delay_threshold_min and a window_end before window_start;
+  POST /commutes answers 400 and saves no row for either
+why: 'G1 requires the engine to decide deterministically whether a commute is affected.
+  Commute.__post_init__ (src/pendel/commute.py) checks only lines and weekdays. A
+  delay_threshold_min of -5 reaches evaluate() through app.py and scheduler.py, and
+  delay > -300 s is true for every on-time departure, so every ridden departure gets
+  flagged: a false positive. A window_end before window_start makes window_bounds()
+  an empty range, so the commute is never affected and silently gets no alerts. app.py
+  already turns a ValueError from Commute into a 400 form response, so validating
+  in the model fixes both the web path and every other caller.'
+acceptance:
+- uv run pytest -q
+- uv run pytest -q tests/test_commute.py -k "negative_delay_threshold or window_end_before_window_start"
+- uv run pytest -q tests/test_web_commutes.py -k "negative_delay_threshold or window_end_before_window_start"
+allowed_paths:
+- src/pendel/commute.py
+- tests/test_commute.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/app.py
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/migrations/**
+- src/pendel/templates/**
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- Dockerfile
+- .github/**
+- pyproject.toml
+- uv.lock
+merged_sha: 92b0876
+merged_at: 2026-09-30T05:19:32+0200

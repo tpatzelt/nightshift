@@ -1,0 +1,70 @@
+depends_on: []
+new_tests_required: false
+attempts: 0
+notes:
+- 'scripts/check-site.sh is this repo''s only test file. Add a new numbered check
+  to it as step 11 (steps 1-10 already exist; do not reuse 9). The acceptance commands
+  require this: they grep check-site.sh for ''_data/projects.yml'' and run a mktemp
+  copy with _data/projects.yml deleted, which must fail.'
+- The new check must fail when _data/projects.yml is missing or has no '- title:'
+  entry, and when index.html does not loop over site.data.projects. Only add to check-site.sh.
+  Never remove or weaken the existing checks.
+- Add <section id="work" class="section" aria-labelledby="work-title"> with <h2 id="work-title">Selected
+  work</h2> between About and Contact. Each entry is an <article> with an <h3> title.
+  Use the same container narrow markup as the other sections.
+- 'Entry fields: title and summary are required. year, url and tags are optional,
+  and each renders only inside {% if %}, so an empty key never produces an empty element
+  (e.g. no empty <ul>). In Liquid an empty array is truthy, so leave optional keys
+  out of the placeholders rather than setting them to [] or ''''.'
+- Do not invent Tim's projects. Use two clearly-marked placeholder entries, e.g. title
+  '[Placeholder project]' and summary '[Placeholder — project description to be supplied
+  by Tim]'. Leave out optional keys on the placeholders.
+- 'Needed from Tim later (list it in your summary): real project names, one-line descriptions,
+  years, and links.'
+- Use 2-space YAML indentation. check-site.sh rejects tabs and empty _data files.
+- 'Keep the CSS restrained: spacing and type size/weight only, no borders or boxes,
+  no new transitions.'
+- new_tests_required is false for this task on purpose. T-0010 and T-0019 were parked
+  by that gate even though check-site.sh is the test file, and T-0018 passed with
+  it set to false. The acceptance commands enforce the regression check instead. Still
+  add step 11.
+created: 2026-09-25T11:25:07+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0020
+project: tpatzelt.github.io
+charter_goal: G2
+roadmap_ref: M2
+title: Render a Selected work section from _data/projects.yml, guarded by a new check
+  in scripts/check-site.sh (re-issue of parked T-0014/T-0019)
+why: G2's definition of done needs a projects section that renders from a data structure,
+  not from copy-pasted markup. index.html has only a hero, About and Contact, and
+  there is no _data/ directory yet. T-0014 was close; T-0019 was parked because no
+  test file changed. In this repo the test is scripts/check-site.sh, so the new behaviour
+  has to be guarded there.
+acceptance:
+- bash scripts/check-site.sh
+- test -f _data/projects.yml
+- grep -q 'site.data.projects' index.html
+- grep -q 'id="work"' index.html
+- grep -q '_data/projects.yml' scripts/check-site.sh
+- d=$(mktemp -d) && cp -r . "$d" && rm "$d/_data/projects.yml" && ! bash "$d/scripts/check-site.sh"
+- python3 -c "import re;t=open('index.html').read();a=t.index('id=\"about\"');w=t.index('id=\"work\"');c=t.index('id=\"contact\"');assert
+  a<w<c"
+allowed_paths:
+- index.html
+- _data/projects.yml
+- assets/css/style.css
+- scripts/check-site.sh
+protected_paths:
+- .github/**
+- _config.yml
+- assets/cv.pdf
+- Gemfile
+- Gemfile.lock
+- _layouts/default.html
+rank: 0
+merged_sha: 2ba22a3
+merged_at: 2026-09-25T21:16:34+0200
