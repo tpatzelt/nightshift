@@ -1,0 +1,61 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Add build_channels(http_client, env) -> dict[str, Channel]. Include 'telegram' only
+  if PENDEL_TELEGRAM_BOT_TOKEN is set and 'ntfy' only if PENDEL_NTFY_URL is set. Any
+  kind that is not configured maps to a small logging no-op channel that sends nothing,
+  so tracker never raises KeyError.
+- 'Add main(argv=None) with a --once flag that runs exactly one Scheduler.tick(now)
+  and returns. Without the flag it calls run_forever. Use db.connect(), a real HafasClient,
+  and the clock dt.datetime.now(BERLIN). Add `if __name__ == ''__main__'': main()`
+  so `python -m pendel.runner` works.'
+- Tests never call run_forever and never touch the network (conftest.py blocks sockets).
+  Inject an httpx.Client(transport=httpx.MockTransport(...)), or monkeypatch the runner's
+  client factory with the hafas_replay fixture over tests/fixtures/hafas/scheduler/*.json.
+- 'Cover: build_channels with neither, one, or both env vars set; that the no-op channel
+  for an unconfigured kind sends nothing and raises nothing; and that main([''--once''])
+  with PENDEL_DATA_DIR=tmp_path and one due affected commute plus a linked ''ntfy''
+  channel row sends exactly one request to the mocked ntfy transport. The ntfy server
+  URL in tests must be a placeholder such as http://ntfy.invalid.'
+- Configuration comes only from env vars. Document every var the runner reads in its
+  module docstring; G4's .pendel.env.example will list them.
+created: 2026-09-29T18:26:41+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0031
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Scheduler process entrypoint `python -m pendel.runner` that builds only configured
+  channels from env
+why: G3 needs a scheduler that actually checks saved commutes before their window,
+  but Scheduler.run_forever is never started anywhere and no code builds real TelegramChannel/NtfyChannel
+  instances from env. tracker._send_to_all does channels[kind], so a user row whose
+  channel kind is not configured would raise KeyError.
+acceptance:
+- uv run pytest -q tests/test_runner.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/runner.py
+- tests/test_runner.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/scheduler.py
+- src/pendel/db.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- src/pendel/app.py
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: 47df548
+merged_at: 2026-09-29T22:49:53+0200

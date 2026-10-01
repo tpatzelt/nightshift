@@ -1,0 +1,73 @@
+depends_on:
+- T-0018
+new_tests_required: true
+attempts: 1
+notes:
+- '_default_window: 23:30 now gives 23:30-00:00 (no clamp). Update test_commutes_new_form_default_window_clamps_end_before_midnight
+  to match. POST /commutes with 23:30-00:30 saves the commute.'
+- '/today: a commute whose window started yesterday and contains now is treated as
+  active, and fetched with that window. Test at 00:10 on a Sunday for a Saturday-only
+  23:30-00:30 commute.'
+- 'attempt 1: reviewer said revise: I''m asking for one test change; the code looks
+  correct. In app.py, _default_window now wraps the end with `% (24*60)`, so 23:30
+  gives 00:00. The new _today_window helper uses Commute.window_containing(now) first,
+  so a Saturday 23:30–00:30 window that is still open at 00:10 Sunday is treated as
+  active. That same window is used for both the departures fetch and the inactive
+  check. The diff stays inside allowed_paths and is small (106 lines), with no new
+  dependency or secret. The renamed default-window test and the new POST test for
+  a 23:30–00:30 commute match the first task note. If the change were reverted, the
+  new /today test would fail (the card would show ''Heute nicht aktiv'').
+
+
+  The gap: the second task note says the crossing commute is ''treated as active,
+  and fetched with that window'', but the test never checks the fetch. _mock_client
+  returns the same payload whatever the request, and the test only checks the status
+  and that the inactive text is absent. So an implementation that marks the card active
+  but fetches today''s (Sunday 23:30) window, or any other window, would still pass.
+
+
+  Required fix, in tests/test_web_today.py only: record the httpx.Request in the MockTransport
+  handler (a local handler, or a capturing variant of _mock_client), then assert that
+  the departures request for _ORIGIN_STOP_ID has a `when` parameter equal to Saturday
+  2026-01-03 23:30 Europe/Berlin (compare it as a parsed datetime) and a `duration`
+  that covers the window through 00:30 Sunday (31 minutes, from max(1, minutes+1)).
+
+
+  Optional: place the payload departure after now (for example 00:20 Sunday) so the
+  card''s next-departures list is also exercised for the crossing window.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0019
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: Setup defaults and today page accept windows crossing midnight
+why: 'G2: setup clamps the default window to 23:59, and /today only looks at today''s
+  window. Both must allow a window crossing midnight.'
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- tests/test_web_commutes.py
+- tests/test_web_today.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 1
+merged_sha: 876d301
+merged_at: 2026-09-30T23:46:17+0200

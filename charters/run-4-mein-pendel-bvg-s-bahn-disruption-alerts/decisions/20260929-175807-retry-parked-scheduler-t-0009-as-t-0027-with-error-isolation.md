@@ -1,0 +1,12 @@
+# Retry parked scheduler T-0009 as T-0027 with error isolation, add 'today on my route' (T-0028) and G5 rate limiting (T-0029); defer G4
+
+_Recorded 20260929-175807 by the NIGHTSHIFT planner._
+
+## Context
+The backlog was empty. G1's definition of done is still blocked on live HAFAS recording, which needs a human decision (see ADR 20260929-125118). G3's last missing piece is the scheduler. T-0009 was parked after attempt 2 got 'revise' for one reason: run_forever and tick had no general exception isolation. src/pendel/scheduler.py does not exist. G2 has stop search, save commute and delete-my-data, but no 'today on my route' page. The NIGHTSHIFT guard reported that agents have no access to any Docker daemon, so G4's `docker build .` and `docker compose config` checks cannot be run by workers today. G5 has no rate limiting. There were no worker followups.
+
+## Decision
+Add T-0027 (G3/M3). It re-scopes T-0009 and adds everything the reviewer accepted in attempt 2, plus (a) per-tick try/except in run_forever, (b) per-commute isolation in tick, (c) bounded tests for both, and the optional check that skips journeys when the disruption is already active. It also passes commute.delay_threshold_min to evaluate, because the engine's default is independent of it. Add T-0028 (G2/M2): GET /today with the engine verdict per commute, an injectable now and a mocked HAFAS client. Add T-0029 (G5/M5): stdlib per-IP rate limiting with a 429 and Retry-After, exempting /healthz. It depends on T-0028 because both edit app.py. The order is T-0027, T-0028, T-0029, following G1 > G3 > G2 > G5. Assumptions, taking the conservative reading: G4 is not planned in this batch, because its definition-of-done commands need Docker, which this sandbox blocks. The rate limiter does not trust X-Forwarded-For by default. T-0009 stays parked because IDs are never reused. The planner made no live or Docker calls.
+
+## Consequences
+G3's definition of done is reachable once T-0027 passes review. After T-0028, all four G2 definition-of-done routes exist, and after T-0029 only the legal pages and footer links remain for G5. G1 is still blocked on live-recording access, and G4's docker build and compose validation are blocked on Docker access. Both need a human decision. The non-Docker parts of G4 (compose file, env example, workflow, DEPLOY.md) can be planned next, with a note that the Docker checks will stay unverified.

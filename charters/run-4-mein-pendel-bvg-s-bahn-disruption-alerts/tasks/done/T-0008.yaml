@@ -1,0 +1,75 @@
+depends_on:
+- T-0004
+- T-0006
+- T-0024
+new_tests_required: true
+attempts: 1
+notes:
+- 'process(conn, commute_id, verdict, channels, now): diff the verdict''s disruption_key(s)
+  against the notifications table. For new keys, send one message (DE+EN reason) and
+  insert ''active''. For keys still active, do nothing. For keys that were active
+  and are now gone, send one resolved message and mark ''resolved''.'
+- 'Test with FakeChannel and a tmp DB: repeated identical verdicts send exactly one
+  message; a cleared verdict sends exactly one resolved message; an unaffected verdict
+  sends nothing.'
+- 'attempt 1: reviewer said revise: The core diff logic is correct and well tested:
+  new, repeated, cleared, reactivated and replaced keys all behave as intended, the
+  tests assert exact FakeChannel output, and the tests would fail if the change were
+  reverted. The change stays within allowed_paths. I checked the actual schema in
+  src/pendel/migrations and found two concrete defects to fix before approval.
+
+
+  (1) Unlinked channels get sent to a None target. In the schema, channels.target
+  is nullable, and a Telegram row exists with target NULL and only a link_token until
+  the /start deep-link completes. _recipients selects every channel row for the user
+  with no filter, so an unlinked Telegram row makes process() call channel.send(None,
+  text). Fix: add `AND target IS NOT NULL` to the query (or filter on linked_at for
+  telegram). Add a test with an unlinked telegram row (target NULL, link_token set)
+  next to a linked ntfy row, and assert that only the ntfy target receives messages.
+
+
+  (2) resolved_at is never written. The notifications table has a `resolved_at TEXT`
+  column. The worker assumed the schema from tests only. When the tracker resolves
+  a key it only sets state=''resolved'' and never records `now`. Fix: the UPDATE should
+  `SET state=''resolved'', resolved_at=?` with now.isoformat(), and the reactivation
+  upsert should reset `resolved_at = NULL`. Extend the cleared and reactivation tests
+  to assert resolved_at, so the row''s timestamps stay consistent and deterministic.
+
+
+  Minor (optional): messages are sent before conn.commit(). If a channel raises partway
+  through, the state is not persisted and the next tick will send again. Committing
+  each key''s state change right after its send (or documenting the at-least-once
+  behaviour) would make this explicit. No secrets, no network access and no new dependencies
+  were introduced.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0008
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Disruption state tracker: notify once per disruption, send a resolved message
+  when it clears'
+why: G3 requires notifying only when G1 says the commute is affected, only once per
+  disruption, and a resolved message when the disruption clears.
+acceptance:
+- uv run pytest -q tests/test_tracker.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/tracker.py
+- tests/test_tracker.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/db.py
+- src/pendel/migrations/**
+- src/pendel/notify/**
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: 4887c65
+merged_at: 2026-09-29T13:50:07+0200

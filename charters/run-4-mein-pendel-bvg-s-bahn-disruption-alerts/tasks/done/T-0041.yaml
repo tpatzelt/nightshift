@@ -1,0 +1,89 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'GATE RULE, and the only reason T-0039/T-0040 were parked: the gate rejects the
+  whole diff if any added line contains two pipe characters followed by a space and
+  the word true. This covers the script, tests, test strings, comments, DEPLOY.md
+  and ci.yaml. Do NOT write a test that asserts the sequence is absent, because that
+  test would contain it. Do not use `||` to silence errors in the script at all. For
+  cleanup, use `set +e` inside the EXIT trap function, and guard `docker rm -f` with
+  an `if docker inspect ... >/dev/null 2>&1; then ... fi` check. Before finishing,
+  run `git diff | grep -F ''|| true''` and confirm it prints nothing.'
+- DEPLOY.md intro (lines 5-6) says 'only the two snippets in steps 6 and 7 are added
+  to the homelab repo by hand'. Today the Caddy route is step 6 and the cloudflared
+  ingress is step 7. If you insert a verify step before them, update that sentence
+  to the new numbers. Add a test in tests/test_deploy.py that finds the numbered steps
+  mentioning Caddy route and cloudflared ingress, and asserts that the intro's 'steps
+  N and M' matches them.
+- 'DEPLOY.md lines 8-10 say docker build and compose config ''must be run by a human''.
+  Reword this to point at deploy/verify.sh, which runs in CI and can be run by the
+  human. Keep it truthful: the NIGHTSHIFT sandbox still cannot run Docker.'
+- You cannot run Docker in this sandbox, and the guard blocks shell commands that
+  call it. Do not try to get around that. Write the script, check it with `bash -n`,
+  and cover it with static text tests.
+- deploy/verify.sh must be executable (chmod +x), start with `#!/usr/bin/env bash`
+  and `set -euo pipefail`, and resolve the repo root from its own location. Keep the
+  original exit status with `exit "$status"` in the trap.
+- 'Steps, in order: (1) copy deploy/compose.yaml and deploy/.pendel.env.example (renamed
+  .pendel.env) into a mktemp dir and run `docker compose -f <tmp>/compose.yaml config
+  -q`. Never create deploy/.pendel.env. (2) Parse .github/workflows/ci.yaml and deploy/compose.yaml
+  with `uv run --no-project --with pyyaml python -c ...yaml.safe_load...`. Do NOT
+  add PyYAML to pyproject.toml or uv.lock. (3) `docker build -t mein-pendel:verify
+  .` from the repo root. (4) Run the web container detached with no -p and no --network,
+  with PENDEL_DATA_DIR=/data and every Telegram/ntfy variable empty. Poll `docker
+  inspect --format ''{{.State.Health.Status}}''` until it reads healthy, and fail
+  after about 90 s. (5) An EXIT trap removes the container and the temp dir.'
+- The script must never contact Telegram, ntfy or HAFAS, and must request no route
+  other than the image's own healthcheck.
+- 'CI: add a `verify` job to .github/workflows/ci.yaml that runs `bash deploy/verify.sh`
+  on ubuntu-latest with actions/checkout@v4 and astral-sh/setup-uv@v5, same as the
+  test job. Change build-and-push to `needs: [test, verify]`. Change nothing else.'
+- 'Tests in tests/test_deploy.py, stdlib only and in the existing style: the script
+  exists and is executable; it has the shebang and `set -euo pipefail`; it contains
+  compose, config, build, Health.Status and trap; it never mentions api.telegram.org
+  or ntfy.sh; it does not write deploy/.pendel.env; ci.yaml runs deploy/verify.sh
+  and build-and-push needs verify; DEPLOY.md mentions deploy/verify.sh; the intro
+  step references match. Update the module docstring sentence that says Docker checks
+  are left to a human so it points at the script.'
+created: 2026-09-30T00:09:35+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0041
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: deploy/verify.sh run by CI before publishing, with DEPLOY.md step references
+  kept consistent (retry of parked T-0040 with no pipe-true string anywhere in the
+  diff)
+why: 'G4''s definition of done needs four checks: `docker build .` succeeds, the container
+  answers its healthcheck in a script, `docker compose -f deploy/compose.yaml config`
+  validates with the example env, and the workflow file is valid YAML. None of them
+  runs anywhere today. The repo has no deploy/verify.sh, ci.yaml has only the test
+  and build-and-push jobs, and DEPLOY.md lines 8-10 still say a human must run the
+  Docker checks. T-0040 failed both attempts on one gate rule only. Its new test contained
+  the literal text `assert "|| true" not in VERIFY_SH`, and the gate rejects any added
+  diff line that contains the pipe-pipe-true sequence, even inside a test string.'
+acceptance:
+- test -x deploy/verify.sh
+- bash -n deploy/verify.sh
+- uv run pytest -q tests/test_deploy.py
+- uv run pytest -q
+allowed_paths:
+- deploy/verify.sh
+- tests/test_deploy.py
+- .github/workflows/ci.yaml
+- DEPLOY.md
+protected_paths:
+- src/**
+- tests/fixtures/**
+- Dockerfile
+- deploy/compose.yaml
+- deploy/.pendel.env.example
+- pyproject.toml
+- uv.lock
+- /plan/**
+merged_sha: 78edcf5
+merged_at: 2026-09-30T00:14:10+0200

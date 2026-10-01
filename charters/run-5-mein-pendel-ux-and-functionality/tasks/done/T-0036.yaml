@@ -1,0 +1,79 @@
+depends_on:
+- T-0035
+new_tests_required: true
+attempts: 1
+notes:
+- Add a pure format_disruption_message(commute_name, verdict, today_url) -> str. The
+  German block comes first, then the English one, as now. Each block names the commute,
+  the line (verdict.line), the planned time as HH:MM in Europe/Berlin (verdict.planned)
+  and the reason, and the message ends with today_url. The scheduler already appends
+  the alternative's summary to the reason (Scheduler._with_alternative), so the alternative
+  arrives inside the reason. Do not change scheduler.py.
+- The commute name is 'origin_name → destination_name', read in process() from the
+  commutes row it already queries. If either name is empty, use a generic 'Deine Verbindung'
+  / 'Your commute'. Never a stop ID.
+- today_url = os.environ.get('PENDEL_PUBLIC_URL', '').rstrip('/') + '/today'. When
+  the variable is unset this is the bare '/today'. Do not edit deploy/. Mention the
+  new variable in your followups so a human can set it after the run.
+- Tests use FakeChannel only. The message contains the commute name, the line, the
+  planned HH:MM (include a DST-period case), the reason, an alternative summary when
+  the verdict reason has one, and '/today'. With PENDEL_PUBLIC_URL=https://example.invalid
+  it contains https://example.invalid/today. The existing once-per-disruption behaviour
+  still holds.
+- Never construct TelegramChannel or NtfyChannel and never send any HTTP request.
+- 'attempt 1: reviewer said revise: I checked the worker''s reason for leaving out
+  PENDEL_PUBLIC_URL and it holds. tests/test_deploy.py::test_env_example_lists_every_pendel_var_used_in_source
+  fails for any PENDEL_* name that appears in src/pendel but not in deploy/.pendel.env.example,
+  and deploy/** is protected. Using a relative ''/today'' behind a today_url parameter
+  is the conservative choice, and the followup (add the env var and update deploy/.pendel.env.example
+  in the same task) should be kept. The deviation is accepted. Everything else fits
+  the task: the change stays in the two allowed files, scheduler.py and deploy/ are
+  untouched, only FakeChannel is used, no HTTP is sent, and no dependency is added.
+  One thing must be fixed. (1) The line is not really tested. In test_disruption_message_names_commute_line_time_reason_and_today_link,
+  `assert "S41" in text` passes even if verdict.line is left out of the message, because
+  reason_de and reason_en already contain ''S41''. Use a verdict whose reason does
+  not mention the line, for example dataclasses.replace(AFFECTED, line="U8", reason_de="Zug
+  fällt aus.", reason_en="Train is cancelled."), and assert "U8" in text. That makes
+  the test fail if the line is removed. Optional: (2) add a direct unit test of the
+  pure format_disruption_message, for example with today_url=''https://example.invalid/today''
+  and a check that the message ends with it, and check that the German block comes
+  before the English one. (3) Add a test for verdict.planned=None, which currently
+  renders ''?'', so the fallback is pinned down. Also optional, and not required:
+  the only DST test is a summer-time case, not one on a transition day. That is enough
+  for ''include a DST-period case''.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0036
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'Tracker: disruption message names commute, line, planned time, reason, alternative
+  and links to /today'
+why: 'G5: a notification names the commute, line, planned time, reason and alternative,
+  and links to the today page. tracker.process sends only the DE and EN reasons.'
+acceptance:
+- uv run pytest -q tests/test_tracker.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/tracker.py
+- tests/test_tracker.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 1
+merged_sha: bd8a659
+merged_at: 2026-10-01T01:02:02+0200

@@ -1,0 +1,52 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Add one link to /stops in index.html, next to the existing /today and /notifications
+  links. Reuse the existing i18n key 'stops_heading' ('Haltestelle suchen' / 'Search
+  for a stop'). Add a new key only if you have a concrete reason, and then add it
+  in both DE and EN.
+- New tests in tests/test_web_home.py, using TestClient(app) without 'with' as the
+  other web tests do, and setting PENDEL_DATA_DIR to tmp_path via monkeypatch. Test
+  that GET / (German default) and GET /?lang=en both contain href="/stops" with the
+  right language text. Test that following the link returns 200.
+- Do not touch app.py or any other template. Do not restyle or restructure. The change
+  should be only a few lines in index.html.
+created: 2026-09-30T06:00:58+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0048
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: Home page links to stop search so a visitor can start saving a commute from
+  '/'
+why: G2 says a visitor searches stops and saves commutes. But src/pendel/templates/index.html
+  links only to /today and /notifications, and has no link to /stops. The only way
+  to reach stop search is the empty-state link on /today, so a first-time visitor
+  on '/' has no direct way into the save-commute flow. This is a small usability gap
+  within G2 and counts as allowed idle work; it adds nothing new.
+acceptance:
+- uv run pytest -q tests/test_web_home.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/templates/index.html
+- src/pendel/i18n.py
+- tests/test_web_home.py
+protected_paths:
+- src/pendel/app.py
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- Dockerfile
+- .github/**
+- pyproject.toml
+- uv.lock
+merged_sha: b9f208e
+merged_at: 2026-09-30T06:02:10+0200

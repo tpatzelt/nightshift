@@ -1,0 +1,65 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Plain CSS only, no framework. Define in :root: color tokens (--color-bg, --color-text,
+  --color-muted, --color-link, --color-border, --color-error and a surface color for
+  cards), spacing tokens (e.g. --space-1..--space-4) and type tokens (--font-family,
+  --font-size-base, --font-size-small, --line-height). Set color-scheme: light dark.'
+- 'Add one @media (prefers-color-scheme: dark) block that redefines only the color
+  tokens on :root.'
+- Outside :root and the dark block, rules use var(--…) only. No raw hex/rgb color
+  literals there. Keep the existing .error rule, but make it use var(--color-error).
+- 'Touch targets: a, button, input[type=submit], input[type=checkbox] labels, select
+  and text inputs get min-height: 44px (and min-width: 44px for buttons/checkbox labels),
+  e.g. nav links as inline-flex with align-items: center. Keep the 360px rule: no
+  fixed width above 360px (tests/test_app.py::test_static_css_has_no_fixed_width_above_360px
+  must stay green).'
+- Status colors and the contrast test are T-0046. Do not add them here. Do not touch
+  templates here.
+- 'tests/test_design.py: read style.css with pathlib and assert: :root declares --color-*,
+  --space-* and --font-* properties; a prefers-color-scheme: dark block redefines
+  every --color-* token declared in :root; no hex/rgb literal appears outside those
+  two blocks; a rule covering a and button sets min-height of at least 44px. Use simple
+  regex parsing, no new dependency.'
+created: 2026-09-30T19:10:19+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0045
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'Stylesheet: design tokens as custom properties, dark mode via prefers-color-scheme,
+  44px touch targets'
+why: 'G4: the stylesheet has 28 lines with hard-coded hex colors, no custom properties,
+  no dark mode and no touch-target sizing. G4 requires a small design system in plain
+  CSS (custom properties for color, spacing and type), light and dark mode following
+  prefers-color-scheme, and touch targets of at least 44px.'
+acceptance:
+- grep -q ':root' src/pendel/static/css/style.css
+- 'grep -q ''prefers-color-scheme: dark'' src/pendel/static/css/style.css'
+- test -f tests/test_design.py
+- uv run pytest -q tests/test_design.py tests/test_app.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/static/css/style.css
+- tests/test_design.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 9
+merged_sha: 8cdb434
+merged_at: 2026-10-01T00:28:12+0200

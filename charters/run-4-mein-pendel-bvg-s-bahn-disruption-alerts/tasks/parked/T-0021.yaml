@@ -1,0 +1,61 @@
+depends_on:
+- T-0016
+new_tests_required: true
+attempts: 0
+notes:
+- 'Live-call budget: at most 10 requests in total, at least 1 s apart, scratch probes
+  included. Never loop over stations. Report the exact total.'
+- Extend the existing recorder and its --record mode. Do not change how the existing
+  fixtures are recorded, and do not edit those files.
+- 'Cancellation: a departure with cancelled true. Delay: a departure with delay >=
+  600 seconds. Both must be real and verbatim-trimmed, using the same trimming rules
+  as T-0020. Never derive or invent them.'
+- Add both files to the README with path, params, UTC time, kind and 'verbatim-trimmed'.
+  Extend test_fixtures_shape.py with per-kind checks.
+- If network access fails, stop and report blocked with the exact command and its
+  error. If one kind cannot be found within the budget, write the other kind, report
+  blocked and name the missing kind. Never work around the sandbox.
+created: 2026-09-29T10:06:19+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0021
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record real cancellation and delay departures fixtures (part of parked T-0015)
+why: G1's definition of done needs at least five real disruption kinds. Cancellation
+  and delay are the most common ones, and attempt 1 of T-0002 found real examples
+  of both. This task records them with the recorder from T-0020 and gives each its
+  own small live budget.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/departures_cancellation.json
+- test -f tests/fixtures/hafas/departures_delay.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/departures_cancellation.json
+- tests/fixtures/hafas/departures_delay.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- tests/fixtures/hafas/departures_undisturbed.json
+- tests/fixtures/hafas/journeys_*.json
+- tests/fixtures/hafas/locations_*.json
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 4
+park_reason: Blocked upstream. It is in the live-recording chain (T-0020 → T-0016
+  → T-0021), and T-0020 is parked after 2 blocked attempts. Live HAFAS recording fails
+  in this sandbox and needs a human decision on network access. No derived or invented
+  fixtures may replace it.

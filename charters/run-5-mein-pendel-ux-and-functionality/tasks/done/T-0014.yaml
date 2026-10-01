@@ -1,0 +1,51 @@
+depends_on:
+- T-0011
+- T-0013
+new_tests_required: true
+attempts: 0
+notes:
+- Make one journeys() call per disrupted commute only, run via run_in_threadpool under
+  _hafas_lock like _fetch_departures. On HafasError the card stays disrupted with
+  no alternative and no error page.
+- Render alternative.summary_de or summary_en under a localized 'Alternative:' label.
+- Test with a MockTransport that routes /stops/.../departures to a disrupted recorded
+  fixture and /journeys to tests/fixtures/hafas/alternatives/synthetic_child_stop_arrival.json
+  (T-0011). The commute's destination must be the parent 900003201, so the test proves
+  the child-stop case end to end. Also test that an OK commute triggers no /journeys
+  request.
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0014
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Today cards: show the suggested alternative for a disrupted commute'
+why: 'G3: a disrupted card shows the suggested alternative when there is one; /today
+  never fetches journeys today.'
+acceptance:
+- uv run pytest -q tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/today.html
+- src/pendel/i18n.py
+- tests/test_web_today.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: ba15986
+merged_at: 2026-09-30T19:14:49+0200

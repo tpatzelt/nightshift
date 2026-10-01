@@ -1,0 +1,89 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'Record with the existing script and write raw output outside the repo: uv run python
+  scripts/record_fixtures.py --record <STOP_ID> ... --duration 30 --results 12 -o
+  /tmp/raw/. Keep --results 12, because platforms_ostkreuz.json with 13 departures
+  is 351 lines and the diff budget is 700. Then run --trim /tmp/raw/<id>.json -o tests/fixtures/hafas/recorded/departures_platform_change.json.
+  Trimming keeps platform and plannedPlatform. Never edit a value by hand and never
+  commit the raw file.'
+- 'Network budget: at most 6 live requests in total, one per stop, each a single call.
+  Do not loop or retry in a script. Try these stops in order and stop at the first
+  response that has a departure with platform and plannedPlatform both non-null and
+  different: Hauptbahnhof 900003201, Ostkreuz 900120003, Friedrichstr. 900100001,
+  Gesundbrunnen 900007102, Suedkreuz 900058101, Spandau 900029101. Check the stop
+  name the API returns before using one of the last three IDs. Inspect each raw file
+  with python/json before you request the next one.'
+- If none of the 6 responses has a platform change, or the API errors, do not fabricate
+  or edit data. Leave the repo unchanged and report status 'blocked', quoting the
+  exact error or saying 'no platform change in 6 recordings at <UTC time>'. A later
+  run can try again.
+- Never contact Telegram, ntfy or any other host. The only allowed host is v6.bvg.transport.rest,
+  and only through scripts/record_fixtures.py --record.
+- Add a row to the first table in tests/fixtures/hafas/recorded/README.md, or a short
+  new section in the style of the platforms_ostkreuz.json section. Give the file,
+  the stop with its ID, the recorded UTC time (the raw file's _recorded_at), and what
+  makes it this kind (line, planned time, 'platform X, planned Y'). test_every_recorded_fixture_is_documented
+  must stay green.
+- In tests/test_engine_recorded.py, add a test in the style of test_next_departures_over_recorded_platform_fixture.
+  Build a commute on the changed departure's line, with a window around its planned
+  time and a fixed NOW just before it. Assert that next_departures returns that departure
+  with the recorded platform and planned_platform, and that the two differ.
+- 'In tests/test_web_today.py, add a test in the style of test_today_platform_change_shown_as_text
+  that replays the recorded file through the mocked HAFAS client, with get_now overridden
+  and a seeded commute on that line from that stop. Assert that the departures block
+  contains ''Gleis <platform> statt <plannedPlatform>'' for lang=de and ''Platform
+  <platform> instead of <plannedPlatform>'' for lang=en, using the recorded values.
+  Everything stays offline: the tests read only the fixture file.'
+created: 2026-10-01T06:32:35+0200
+max_diff_lines: 700
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0056
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M9
+title: Record one real departures fixture with a platform change and test that /today
+  shows it in DE and EN
+why: 'G3 requires the today page to show planned vs real-time platform. The platform-change
+  wording (''Gleis 3 statt 1'') is only tested against a synthetic payload (tests/test_web_today.py
+  test_today_platform_change_shown_as_text). None of the recorded fixtures has a departure
+  where platform differs from plannedPlatform: the six departures_*.json files have
+  their platform fields trimmed away, and platforms_ostkreuz.json has no change. The
+  charter''s allowed idle work includes ''recorded fixtures of further real disruption
+  kinds'' and says to prefer real recorded fixtures. This task adds one fixture and
+  the tests for it. It adds no feature.'
+acceptance:
+- test -f tests/fixtures/hafas/recorded/departures_platform_change.json
+- uv run python -c "import json; d=json.load(open('tests/fixtures/hafas/recorded/departures_platform_change.json'))['departures'];
+  assert any(x.get('platform') and x.get('plannedPlatform') and x['platform'] != x['plannedPlatform']
+  for x in d)"
+- grep -q departures_platform_change.json tests/fixtures/hafas/recorded/README.md
+- uv run pytest -q tests/test_engine_recorded.py tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- tests/fixtures/hafas/recorded/departures_platform_change.json
+- tests/fixtures/hafas/recorded/README.md
+- tests/test_engine_recorded.py
+- tests/test_web_today.py
+protected_paths:
+- src/**
+- scripts/**
+- tests/conftest.py
+- tests/fixtures/hafas/recorded/departures_cancellation.json
+- tests/fixtures/hafas/recorded/departures_construction.json
+- tests/fixtures/hafas/recorded/departures_delay.json
+- tests/fixtures/hafas/recorded/departures_replacement_service.json
+- tests/fixtures/hafas/recorded/departures_undisturbed.json
+- tests/fixtures/hafas/recorded/departures_warning.json
+- tests/fixtures/hafas/recorded/platforms_ostkreuz.json
+- tests/fixtures/hafas/recorded/locations_*.json
+- pyproject.toml
+- uv.lock
+- README.md
+- deploy/**
+- docs/**
+merged_sha: c453b55
+merged_at: 2026-10-01T06:35:29+0200

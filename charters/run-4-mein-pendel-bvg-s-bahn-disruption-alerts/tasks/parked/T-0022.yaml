@@ -1,0 +1,61 @@
+depends_on:
+- T-0021
+new_tests_required: true
+attempts: 0
+notes:
+- 'Live-call budget: at most 8 requests in total, at least 1 s apart, scratch probes
+  included. Never loop over stations. Report the exact total.'
+- Construction means a remark whose text or summary really describes Bauarbeiten or
+  construction work on the departure's line or stop. The S-Bahn Ring S41/S42 is a
+  good place to look. 'Additional service', other status remarks and generic hints
+  do not count.
+- Record verbatim-trimmed only, using the same trimming rules as T-0020. Never derive
+  or invent it.
+- Add the file to the README with path, params, UTC time, kind and 'verbatim-trimmed'.
+  Extend test_fixtures_shape.py with a check that a remark mentions Bau or construction.
+- If network access fails, stop and report blocked with the exact command and its
+  error. If no construction remark is found within the budget, report blocked with
+  the stops you tried. Never work around the sandbox.
+created: 2026-09-29T10:06:19+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0022
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Record a real construction/Bauarbeiten remark departures fixture (part of parked
+  T-0015)
+why: G1 names a construction remark on a used line or stop as a disruption kind, and
+  its definition of done needs it as a recorded real fixture. This task records it
+  on its own, with its own budget, so a failure here does not block the other kinds.
+acceptance:
+- uv run python scripts/record_fixtures.py --help
+- test -f tests/fixtures/hafas/departures_construction.json
+- uv run pytest -q tests/test_fixtures_shape.py
+- uv run pytest -q
+allowed_paths:
+- scripts/record_fixtures.py
+- tests/fixtures/hafas/README.md
+- tests/fixtures/hafas/departures_construction.json
+- tests/test_fixtures_shape.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- tests/test_harness.py
+- tests/fixtures/hafas/harness/**
+- tests/fixtures/hafas/departures_undisturbed.json
+- tests/fixtures/hafas/departures_cancellation.json
+- tests/fixtures/hafas/departures_delay.json
+- tests/fixtures/hafas/journeys_*.json
+- tests/fixtures/hafas/locations_*.json
+- src/**
+- pyproject.toml
+- uv.lock
+rank: 5
+park_reason: Blocked upstream. It is in the live-recording chain (T-0021 → T-0022),
+  and T-0020 is parked after 2 blocked attempts. Live HAFAS recording fails in this
+  sandbox and needs a human decision on network access.

@@ -1,0 +1,59 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- One card (<article> or <li>) per commute, headed 'origin_name → destination_name'.
+  For an old commute with empty names, show a localized generic label (DE+EN, e.g.
+  'Gespeicherte Verbindung' / 'Saved commute'). Never render a stop ID anywhere in
+  the page, including attributes.
+- 'Status values and CSS classes: status-ok, status-disrupted, status-paused, status-failed,
+  plus the existing status-inactive for ''not active today''. Every status element
+  carries visible localized text (e.g. ''OK'', ''Gestört'' / ''Disrupted'', ''Pausiert''
+  / ''Paused'', ''Prüfung fehlgeschlagen'' / ''Checking failed'') and a decorative
+  aria-hidden icon character. Never convey status by class or color alone.'
+- 'Paused commutes: status paused, and their origin is never fetched (a paused-only
+  user makes zero HAFAS calls). The HafasError path becomes status failed.'
+- The reason stays in the UI language only (verdict.reason_de or reason_en).
+- 'Tests: one page with an OK, a disrupted, a paused and a failed commute (use recorded
+  fixtures, e.g. departures_undisturbed.json and departures_warning.json, and a failing
+  client for another origin). Assert the stop names appear, none of the 9-digit IDs
+  appear, each status label text appears, and the paused origin is not requested.
+  Keep the 360px layout test passing.'
+- Do not add next departures or alternatives yet (T-0013, T-0014).
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0012
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Today cards: stop names, paused and failed statuses with text labels'
+why: 'G3: /today shows raw stop IDs, ignores the paused flag and has no clear OK /
+  disrupted / paused / checking-failed status. Each card must show stop names and
+  a labelled status.'
+acceptance:
+- uv run pytest -q tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/today.html
+- src/pendel/i18n.py
+- tests/test_web_today.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: af5d422
+merged_at: 2026-09-30T18:58:15+0200

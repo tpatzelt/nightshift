@@ -1,0 +1,106 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- 'Use a frozen dataclass: origin_stop_id, destination_stop_id, lines (normalised
+  line names such as ''S41'', ''U8'', ''M10''), weekdays (set of 0-6), window_start
+  and window_end (datetime.time), delay_threshold_min (default 5).'
+- 'Provide helpers: is_active_on(date), window_bounds(date) -> aware datetimes in
+  ZoneInfo(''Europe/Berlin''), and next_window_start(now) for the scheduler.'
+- 'Test the DST transitions: 2026-03-29 (spring forward) and 2026-10-25 (fall back).
+  Include a window starting inside the skipped hour 02:00-03:00 and one inside the
+  repeated hour. Document the chosen semantics (fold=0) in a docstring.'
+- If zoneinfo cannot find Europe/Berlin without tzdata, report it as a followup. Do
+  not add a dependency in this task (pyproject.toml is protected).
+- 'Requeued by Tim after an orchestrator bug cut reviewer notes to 600 characters.
+  The previous attempt was reviewed as close; its full review follows. Fix every point
+  in it.
+
+  The diff fits G1/M1, only touches the two allowed files, adds no dependencies, and
+  all gates pass. The fix itself is right: next_window_start now compares UTC instants.
+  I checked it on this branch at four points. Spring-forward, Sunday window 02:30-02:45,
+  now=2026-03-29T01:10Z: returns today at 02:30+01:00, which is 01:30Z. Same window,
+  now=01:40Z: returns 2026-04-05. Fall-back, window 02:30-03:30, now=2026-10-25T00:30Z:
+  returns today. Same window, now=01:15Z: returns 2026-11-01. The new fall-back regression
+  test fails against the attempt-1 code, so it is a real test. What still needs fixing:
+  (1) Only the fall-back side of next_window_start is tested. The attempt-1 comparison
+  also broke on the spring-forward day. When now is 2026-03-29T01:10Z (03:10 CEST)
+  and the Sunday window starts at 02:30, which resolves to 01:30Z, the old wall-clock
+  check (02:30 >= 03:10 is false) skipped today and returned next Sunday. No test
+  catches that. Add tests/test_commute.py::test_next_window_start_spring_forward_gap_window_still_upcoming:
+  weekdays={6}, window 02:30-02:45, now=datetime(2026,3,29,1,10,tzinfo=timezone.utc).
+  Assert the result as a UTC instant is 2026-03-29T01:30Z, not the date 2026-04-05.
+  Add the opposite case too: now=01:40Z must return 2026-04-05. (2) Recommended, not
+  blocking: window_bounds and next_window_start return datetimes that are not normalised.
+  For a start in the skipped hour they return 02:30+01:00 on a CEST day. The module
+  docstring says aware datetimes built from the same BERLIN instance compare by wall
+  clock, which is exactly the trap the G3 scheduler would fall into. Consider returning
+  `.astimezone(BERLIN)`, which gives 03:30+02:00 there and keeps fold correct in the
+  repeated hour. Update the docstring and tests to match, or at least state in the
+  window_bounds and next_window_start docstrings that callers must compare the values
+  as UTC. Assumptions I made: Monday=0 weekdays and a forward-scanning next_window_start
+  are both acceptable for this task. The tzdata followup is correctly deferred.'
+- 'attempt 1: reviewer said revise: Scope is fine: the diff fits G1/M1, touches only
+  the two allowed files and adds no dependency. Both points from the previous review
+  were acted on, and the spring-forward regression tests look right. But the fix leaves
+  a real DST bug, and the module docstring gives callers wrong advice.
+
+
+  (1) BUG: next_window_start gives the wrong answer when `now` is a Berlin-aware datetime
+  in the repeated hour. Python compares two aware datetimes that share the same tzinfo
+  object by wall clock and ignores fold (PEP 495 intra-zone rule). It does not compare
+  them as UTC instants. Reproduced on this branch: Commute(weekdays={6}, window 02:30-03:30),
+  now = datetime(2026,10,25,1,15,tzinfo=timezone.utc).astimezone(BERLIN), which is
+  02:15+01:00 with fold=1. next_window_start(now) returns 2026-10-25 02:30+02:00,
+  which is 00:30Z and 45 minutes before `now`. The expected result is 2026-11-01.
+  This is exactly the call a G3 scheduler would make with datetime.now(BERLIN). Fix:
+  compare in UTC, e.g. `if start.astimezone(timezone.utc) >= now.astimezone(timezone.utc)`,
+  or convert `now` to UTC once at the top.
+
+
+  (2) The module docstring says comparing aware instants is ''exactly what Python
+  does when comparing two aware datetimes, regardless of their UTC offsets''. That
+  is false for same-tzinfo operands, and it is the trap in (1). Correct it: callers
+  must convert to UTC before comparing, or use the timestamp.
+
+
+  (3) Tests: every next_window_start test passes `now` in UTC, so none catch (1).
+  Add tests/test_commute.py::test_next_window_start_fall_back_berlin_aware_now_in_second_occurrence
+  with the reproduction above, asserting start.date() == date(2026,11,1). Also add
+  a Berlin-aware `now` variant of one spring-forward case. Also tighten the fall-back
+  ''still upcoming'' test to assert the UTC instant (2026-10-25T00:30Z), not just
+  the date.
+
+
+  The _normalise round-trip through UTC is sound and well documented. The tzdata and
+  serialization followups are correctly deferred.'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0003
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: Commute model with weekdays and Europe/Berlin departure window, DST-tested
+why: 'G1 defines a commute as a saved route: origin stop, destination stop, lines
+  ridden, weekdays and departure window. The charter requires Europe/Berlin times
+  throughout, with DST transitions tested.'
+acceptance:
+- uv run pytest -q tests/test_commute.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/commute.py
+- tests/test_commute.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- src/pendel/hafas/**
+- tests/fixtures/**
+- uv.lock
+- pyproject.toml
+rank: 0
+merged_sha: edb1a26
+merged_at: 2026-09-29T08:41:18+0200

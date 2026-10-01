@@ -1,0 +1,52 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- In _candidate, accept the last leg when destination.id equals commute.destination_stop_id
+  OR destination.station.id equals it (HAFAS /journeys reports child stops as type
+  'stop' with a nested 'station' object). Keep the other filters as they are.
+- 'No live requests. Add a small synthetic /journeys fixture, labelled synthetic in
+  a top-level ''_comment'' key. Model it on the real parent/child pair recorded in
+  departures_delay.json: child 900003200 [Gleis 1-8] with station 900003201 (S+U Berlin
+  Hauptbahnhof). The saved destination is 900003201 and the only non-affected journey
+  arrives at 900003200.'
+- 'Tests: the child-stop arrival is found; a journey whose destination is an unrelated
+  stop with no matching station is still rejected; all existing alternative tests
+  stay green.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0011
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Alternatives: accept an arrival at a child stop of the saved destination'
+why: 'G3: the alternative must still be found when HAFAS reports the journey''s arrival
+  at a child stop of the saved destination; suggest_alternative only accepts last_leg.destination.id
+  == destination_stop_id.'
+acceptance:
+- test -f tests/fixtures/hafas/alternatives/synthetic_child_stop_arrival.json
+- uv run pytest -q tests/test_alternatives.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/alternatives.py
+- tests/test_alternatives.py
+- tests/fixtures/hafas/alternatives/synthetic_child_stop_arrival.json
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: '5846125'
+merged_at: 2026-09-30T18:52:23+0200

@@ -1,0 +1,94 @@
+depends_on:
+- T-0032
+new_tests_required: true
+attempts: 0
+notes:
+- 'Re-issue of parked T-0033. The repo has none of its work yet (HEAD is T-0032),
+  so implement it from scratch. The previous reviewer accepted everything in the design
+  below. Budget is raised because attempt 1 ended without a status. ALWAYS finish
+  with an explicit status: ''done'', or ''blocked'' with a reason.'
+- 'Assumption (unchanged from T-0033): editing keeps the saved origin and destination,
+  including their stop ids, names and the paused flag. The visitor changes lines,
+  weekdays, window and delay threshold. The edit page links to /stops for a commute
+  with other stops.'
+- 'GET /commutes/{commute_id}/edit: resolve the user with the existing _require_owned_commute_redirect
+  helper, then find the commute among db.list_commutes(db_conn, uid). Return 404 if
+  there is no uid cookie, the uid is unknown, the id is unknown or the commute belongs
+  to another user. Render commute_new.html with context[''commute_id''] = commute_id.
+  Prefill the saved lines, weekdays (as strings, matching the template''s `i|string
+  in selected_weekdays`), window as HH:MM and delay. Line choices come from _line_choices_for_origin(hafas_client,
+  saved origin_stop_id, now). Merge the saved lines into the choices so a saved line
+  that is missing today still shows as a checked checkbox.'
+- 'POST /commutes/{commute_id}: parse the urlencoded body the same way POST /commutes
+  does. Build a Commute from the STORED origin/destination ids and names, the stored
+  paused flag and the posted lines/weekdays/window/delay, with the same validation
+  (windows crossing midnight are allowed). On success, call db.update_commute scoped
+  to the uid and redirect 303 to /commutes. On invalid input, re-render commute_new.html
+  with status 400, the error_message (role=alert) and the posted values, and change
+  nothing. Unknown or foreign id, or no cookie: 404 and nothing changes.'
+- 'commute_new.html, reviewer fix (1): wrap the four origin/destination hidden inputs
+  in `{% if commute_id is not defined %}` (use `is defined`, not truthiness). In edit
+  mode, the form action is /commutes/{{ commute_id }}. The lines_unavailable retry
+  link points to /commutes/{{ commute_id }}/edit instead of the query-string URL that
+  carries stop ids. The create flow (no commute_id in context) must render exactly
+  as before, so the existing tests stay green.'
+- 'commutes.html: add an Edit/Bearbeiten link per commute to /commutes/{{ item.commute_id
+  }}/edit, with a named aria-label like the pause/delete buttons (new DE+EN i18n keys).
+  Add DE+EN strings for the edit heading and submit button, and for the link to /stops
+  for other stops.'
+- 'Tests in tests/test_web_commutes.py: (a) the edit form shows the saved lines, weekdays,
+  window and delay prefilled/checked, in DE and EN, and `_NINE_DIGIT_RE.search(response.text)
+  is None` for both. (b) A saved line absent from the origin''s departures is still
+  rendered checked. (c) A valid edit changes only that commute and keeps the paused
+  flag and stop names; a second commute is unchanged. (d) Reviewer fix (2): invalid
+  edits return 400 with role=alert and change nothing, parametrized over at least
+  an out-of-range weekday, no lines selected, and window_start ''25:00''. Also assert
+  _NINE_DIGIT_RE finds nothing in the 400 re-render. (e) Another user''s commute,
+  an unknown id and a missing cookie each get 404 on GET and POST, and the rows are
+  unchanged. (f) /commutes shows the Edit/Bearbeiten link. (g) The edit page passes
+  the existing 360px/viewport check pattern.'
+created: 2026-10-01T00:13:41+0200
+max_diff_lines: 500
+timeout_min: 60
+max_turns: 80
+status: done
+id: T-0050
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'My commutes: edit one commute''s lines, days, window and delay threshold (re-issue
+  of parked T-0033 with reviewer fixes)'
+why: 'G2: every saved commute can be edited on its own. db.update_commute(conn, user_id,
+  commute_id, commute) exists and returns whether a row changed (T-0007), but the
+  repo has no edit route or form yet. The last commit is T-0032, so none of T-0033''s
+  work landed. T-0033 was parked after review. The reviewer found two gaps: the edit
+  page still renders 9-digit stop IDs in hidden inputs, and the invalid-edit test
+  covers only one field. T-0034 (G2 done check), T-0038 and T-0048 are waiting on
+  this task.'
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/commute_new.html
+- src/pendel/templates/commutes.html
+- src/pendel/i18n.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- src/pendel/db.py
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 1
+merged_sha: ad672bc
+merged_at: 2026-10-01T00:19:20+0200

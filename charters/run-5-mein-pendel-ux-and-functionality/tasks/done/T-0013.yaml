@@ -1,0 +1,87 @@
+depends_on:
+- T-0010
+- T-0012
+new_tests_required: true
+attempts: 1
+notes:
+- Use engine.next_departures (T-0010) on the departures the route already fetched.
+  Make no extra HAFAS call.
+- 'Show up to 3 departures per OK or disrupted card: line, planned HH:MM, the real-time
+  HH:MM when it differs (with the delay in minutes as text), and the platform. Show
+  a platform change as text, e.g. ''Gleis 3 statt 1'' / ''Platform 3 instead of 1''.
+  A cancelled departure says so in words. Use <time datetime=...>.'
+- 'No departures: show a localized ''no departures in the window'' line. Paused and
+  failed cards show no departures list.'
+- Test with tests/fixtures/hafas/recorded/platforms_ostkreuz.json, overriding get_now
+  to a time inside that recording, and assert a planned and a real-time time and a
+  platform appear. Add DE+EN strings.
+- 'attempt 1: reviewer said revise: The implementation is right and stays in scope.
+  It reuses next_departures on the departures the route already fetched, with no extra
+  HAFAS call. It shows up to 3 departures, uses <time datetime>, shows platform changes
+  as text, has DE+EN strings, and only touches the four allowed paths (216 lines).
+  The recorded platforms_ostkreuz test is solid: RB32 is planned 17:18, real time
+  17:20, delay 120s, platform 14, and the 17:18, 17:20, +2 Min. and Gleis 14 assertions
+  would all fail if the change were reverted. Two gaps in the tests, though:
+
+
+  (1) The check that a cancelled departure says so in words proves nothing. In test_today_affected_commute_shows_reason_in_german_and_english,
+  the new assertions `''fällt aus'' in response_de.text` and `''cancelled'' in response_en.text`
+  already pass because of the verdict reason (''S41 fällt aus.'' / ''S41 is cancelled.''),
+  which was on the page before this change. They would still pass if the `{% if dep.cancelled
+  %}` branch in today.html were deleted. Assert against the departures list instead.
+  For example, pull out the `<ul class="departures">` block and check that it contains
+  the planned time and ''fällt aus'' / ''cancelled''. Or assert a pattern that appears
+  only in the list, such as `<time datetime="2026-01-05T07:45:00+01:00">07:45</time>`
+  followed by the cancelled span.
+
+
+  (2) The task note ''Paused and failed cards show no departures list'' has no test.
+  Add assertions to the existing paused and HAFAS-failure tests (or the multi-status
+  test from T-0012) that neither ''Keine Abfahrten in diesem Zeitfenster.'' nor ''class="departures"''
+  appears for those cards. A regression that passes departures=[] for those cards
+  would otherwise go unnoticed.
+
+
+  Optional: assert the `<time datetime=...>` attribute at least once, since the task
+  requires it.
+
+
+  I accept the worker''s assumptions: delay text is keyed on delay_min, early departures
+  show as negative minutes, and ''instead of'' wording appears only when both platforms
+  are known and differ. There are no risks, secrets or new dependencies.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0013
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Today cards: next departures with planned vs real-time time and platform'
+why: 'G3: each today card shows the next departures on the ridden lines with planned
+  vs real-time time and platform.'
+acceptance:
+- uv run pytest -q tests/test_web_today.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/today.html
+- src/pendel/i18n.py
+- tests/test_web_today.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: a9a9950
+merged_at: 2026-09-30T19:08:49+0200

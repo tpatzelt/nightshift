@@ -1,0 +1,45 @@
+depends_on:
+- T-0017
+new_tests_required: true
+attempts: 0
+notes:
+- '_due_commute: also consider the window that started yesterday, via Commute.window_containing
+  plus the lead time before today''s start. Keep WHERE paused = 0.'
+- 'Tests with a fake HAFAS and FakeChannel: a 23:30-00:30 commute active on Saturday
+  is fetched at 00:10 on Sunday, and one not active on Saturday is not. The same on
+  the 2026-10-25 fall-back night for a 23:30-02:30 window at 02:30 in both folds.
+  A paused crossing commute is never fetched.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0018
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Scheduler: check windows that cross midnight, including on a DST night'
+why: 'G2: the scheduler must handle a window crossing midnight, including on a DST
+  transition night. _due_commute only looks at today''s window.'
+acceptance:
+- uv run pytest -q tests/test_scheduler.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/scheduler.py
+- tests/test_scheduler.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: 350ef54
+merged_at: 2026-09-30T18:50:37+0200

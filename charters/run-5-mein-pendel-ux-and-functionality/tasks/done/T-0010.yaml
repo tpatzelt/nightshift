@@ -1,0 +1,69 @@
+depends_on:
+- T-0009
+new_tests_required: true
+attempts: 1
+notes:
+- 'Add a pure `next_departures(commute, departures_json, now, limit=3)`. It returns
+  small frozen dataclasses (line, planned: datetime, realtime: datetime|None, delay_min:
+  int|None, planned_platform, platform, cancelled) for ridden lines only (match with
+  _line_key), departing at or after now, sorted by planned time.'
+- Test it against tests/fixtures/hafas/recorded/platforms_ostkreuz.json, using a now
+  and lines that exist in that file, and against a synthetic case with a cancellation
+  and a platform change.
+- 'attempt 1: reviewer said revise: The change stays inside the allowed paths and
+  the task''s scope, and the gates pass. It needs two fixes before approval. (1) Wrong
+  filter. The code drops any departure whose plannedWhen is before now, even if it
+  has not left yet. The task asks for departures ''departing at or after now'', and
+  a delayed train that is still to come is exactly what the G3 today card has to show.
+  The recorded fixture has this case: M43 is planned for 17:13 with real-time 17:33.
+  With now = 17:15 it would be hidden, even though it leaves 18 minutes later. Fix:
+  filter on the actual departure time, which is `when` if present and `plannedWhen`
+  otherwise (cancelled departures have no `when`). Keep sorting by planned time as
+  the task says. Add a synthetic test: a ridden line planned before now with a real-time
+  after now must be included, and one whose real-time is also before now must be excluded.
+  The worker''s assumption that evaluate() filters on planned time is about the commute
+  window, not about ''departing after now'', so it doesn''t justify this. (2) The
+  tests never check the `realtime` value. The only check on it is `is None`. If the
+  code were changed to always set `realtime=None`, every test would still pass, yet
+  planned vs real-time is the core G3 requirement. Assert `realtime` in the recorded
+  test: RB32 real-time should be 17:20+02:00 (planned 17:18), and S41 real-time should
+  equal planned. Also assert it in the synthetic tests. Minor: `delay // 60` rounds
+  down, so an early departure of -30s gives -1 min. Consider `int(delay / 60)` or
+  document the rounding, and test one negative delay. The synthetic cancellation sets
+  delay=300 and a real-time platform, which HAFAS usually leaves null for cancelled
+  trips. That''s acceptable, but a case with `when=None` plus `cancelled=True` would
+  be more realistic and would cover the fallback from item 1.'
+created: 2026-09-30T13:18:09+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0010
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: 'Engine helper: next departures on the ridden lines with planned/real-time
+  time and platform'
+why: 'G3: each today card shows the next departures on the commute''s lines with planned
+  vs real-time time and platform. No code extracts that yet.'
+acceptance:
+- uv run pytest -q tests/test_engine.py tests/test_engine_recorded.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine.py
+- tests/test_engine_recorded.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/platforms_ostkreuz.json
+merged_sha: 84cd46d
+merged_at: 2026-09-30T18:45:25+0200

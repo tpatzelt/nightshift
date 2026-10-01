@@ -1,0 +1,12 @@
+# All goals are done; queue one recorded-fixture task for a real platform change as idle work
+
+_Recorded 20261001-063235 by the NIGHTSHIFT planner._
+
+## Context
+The backlog is empty and has no worker followups. Every goal's definition-of-done task is done (G1 T-0006, G3 T-0049, G2 T-0034, G5 T-0040, G4 T-0045/46/51/52), and so are the idle tasks T-0054 (README) and T-0055 (a11y labels). Parked T-0015, T-0016, T-0033, T-0039 and T-0048 were each superseded by a done re-issue and stay parked as history. I read the code. The 360px layout test already covers every page: home, the legal pages, /stops, /commutes/new, the edit page, /commutes, /today and /notifications. Generic remark summaries ('Information.', 'Störung.') already have real recorded examples and a fallback test. One G3 behavior is tested only against synthetic data: the platform-change wording ('Gleis 3 statt 1', from app._platform_text). The six departures_*.json fixtures have their platform fields trimmed away, and platforms_ostkreuz.json has no departure where platform differs from plannedPlatform.
+
+## Decision
+Under 'Allowed idle work' (recorded fixtures of further real disruption kinds, tests), add milestone M9 [G3] and one task, T-0056. It records one small real departures response that contains a platform change, using the existing scripts/record_fixtures.py with at most 6 single requests and --results 12 to stay inside the diff budget. It documents the file in the fixtures README and adds an engine test and a /today test (DE and EN) over it. src/**, scripts/** and the existing fixtures are protected. Assumption: a platform change counts as a 'disruption kind' for this idle-work clause, because G3 names the platform among what the card must show. Assumption: if no live platform change turns up in 6 requests, or the API errors, the worker reports blocked and does not fabricate data. The charter treats API outages as retry-later and not as a sandbox block, so a later planner may re-issue the task. Assumption: allowed_paths names the new fixture file by its exact future path, inside an existing directory.
+
+## Consequences
+The queue holds one low-risk task that cannot change runtime behavior. It makes 6 or fewer requests to the public HAFAS instance, well under its rate limit, and contacts no messaging service. If the task comes back blocked for lack of a live platform change, the next planner can retry it at a busier time of day or leave the backlog empty. After it is done, further idle work is optional and the backlog may stay empty.

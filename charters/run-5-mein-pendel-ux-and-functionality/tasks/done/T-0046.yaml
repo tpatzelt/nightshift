@@ -1,0 +1,55 @@
+depends_on:
+- T-0045
+new_tests_required: true
+attempts: 0
+notes:
+- Status values are ok, disrupted, paused and failed (see _STATUS_ICONS in src/pendel/app.py).
+  today.html renders <p class="status-{{ item.status }}"> with an aria-hidden icon
+  and a text label. Do not edit today.html (T-0014 owns it).
+- 'In :root and in the dark block, define --status-<s>-fg and --status-<s>-bg for
+  each of the four statuses as 6-digit hex. .status-<s> uses color: var(--status-<s>-fg);
+  background: var(--status-<s>-bg), plus a border or padding from the spacing tokens.'
+- Also check --color-text on --color-bg and --color-error on --color-bg at 4.5:1 in
+  both modes.
+- 'tests/test_design.py: parse the hex values from :root and from the prefers-color-scheme:
+  dark block, compute WCAG 2.x relative luminance and the contrast ratio in pure Python,
+  and assert >= 4.5 for each fg/bg pair in both modes. Also assert that each .status-<s>
+  rule references the matching custom properties.'
+created: 2026-09-30T19:10:19+0200
+max_diff_lines: 300
+timeout_min: 40
+max_turns: 50
+status: done
+id: T-0046
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'Stylesheet: status colors for OK/disrupted/paused/failed with a 4.5:1 contrast
+  test in light and dark mode'
+why: 'G4 definition of done: a contrast test checks the status colors against their
+  backgrounds at 4.5:1 in both modes. today.html renders .status-ok/.status-disrupted/.status-paused/.status-failed,
+  but the stylesheet does not style them.'
+acceptance:
+- grep -q 'status-disrupted' src/pendel/static/css/style.css
+- uv run pytest -q tests/test_design.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/static/css/style.css
+- tests/test_design.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 10
+merged_sha: 946d2bf
+merged_at: 2026-10-01T00:30:32+0200

@@ -1,0 +1,110 @@
+depends_on:
+- T-0030
+new_tests_required: true
+attempts: 1
+notes:
+- 'Rebuild the design the reviewer accepted in T-0029: a stdlib fixed-window limiter
+  keyed by request.client.host, with PENDEL_RATE_LIMIT_PER_MIN (default 60) validated
+  at startup. Use a bounded LRU store with a lock and an injected clock, and put Retry-After
+  on the 429. Do not trust X-Forwarded-For and document why in the module docstring.
+  Exempt exactly path == ''/healthz'' and path.startswith(''/static/'').'
+- The middleware limits only when app.state.rate_limiter is not None. Only the FastAPI
+  lifespan sets it, so bare TestClient(app) in other test modules is never limited
+  and the suite's behaviour cannot depend on how many requests other files make.
+- 'Fix from T-0029 review (2): in the lifespan, wrap the yield in try/finally and
+  set app.state.rate_limiter = None after it, so the limiter never leaks past `with
+  TestClient(app)`.'
+- 'Fix from T-0029 review (1): add a test that uses monkeypatch.setenv(''PENDEL_RATE_LIMIT_PER_MIN'',
+  ''2''), opens `with TestClient(app) as c:`, and asserts 200, 200, then 429 with
+  Retry-After on ''/''. After the block it must assert app.state.rate_limiter is None.
+  Add another test proving an invalid env value (for example ''abc'' or ''0'') makes
+  `with TestClient(app)` raise.'
+- 'Keep the unit tests from T-0029: with an injected clock and a small limit, requests
+  on ''/'' up to the limit each get 200; the next gets 429 with Retry-After; a different
+  IP is unaffected; the limit resets after the window; /healthz is never limited.
+  Annotate generator fixtures as Iterator[...].'
+- 'attempt 1: reviewer said revise: The code does what the task asks. The limiter
+  is stdlib, fixed-window, and keyed by request.client.host. It has a bounded LRU
+  store with a lock and an injected clock. The lifespan uses try/finally and resets
+  app.state.rate_limiter to None. The middleware only limits when a limiter is set.
+  The exemptions are exactly ''/healthz'' and paths starting with ''/static/''. A
+  429 carries Retry-After. The review fixes from T-0029 are covered: the lifespan
+  test asserts 200, 200, then 429 with Retry-After and checks app.state.rate_limiter
+  is None afterwards, and a separate test shows an invalid env value makes startup
+  raise. Several tests would fail if the change were reverted. Gates are green and
+  the diff is 259 lines, within the limit.
+
+
+  The blocking issue is the module docstring the task asked for. It says: ''This app
+  has no trusted reverse proxy in front of it''. That is wrong for the charter''s
+  own deployment. G4 puts the app behind Caddy on caddy_network with cloudflared in
+  front, and the Dockerfile CMD starts uvicorn without --proxy-headers or --forwarded-allow-ips.
+  In production, request.client.host is therefore Caddy''s container IP for every
+  visitor. The ''per-IP'' limit becomes one global bucket of 60 requests per minute
+  across all users. On a Reddit launch most visitors would get 429s. Not trusting
+  a raw X-Forwarded-For header in the app is still correct, so keep that. But the
+  docstring must describe the real situation instead of saying there is no proxy.
+  Required fix, within allowed_paths: rewrite the docstring to say that behind the
+  G4 Caddy/cloudflared setup the peer address is the proxy. Correct per-client keying
+  must come from uvicorn''s --proxy-headers with --forwarded-allow-ips restricted
+  to the Caddy network, not from reading headers in this module. Record a follow-up
+  task to change the Dockerfile CMD and document it in DEPLOY.md, since both are outside
+  this task''s paths.
+
+
+  Non-blocking:
+
+  (a) test_static_assets_are_exempt_from_the_rate_limit never checks the status of
+  the static responses. Assert 200 so the test shows a real asset is served and not
+  counted.
+
+  (b) The different-IP and window-reset cases are only tested on RateLimiter, not
+  through ''/'' in the app. This is acceptable because the lifespan cannot inject
+  a clock.
+
+  (c) The worker''s follow-up is valid: PENDEL_RATE_LIMIT_PER_MIN should be added
+  to deploy/.pendel.env.example.
+
+
+  Assumption: the Bash tool was blocked by the sandbox guard, so I could not grep
+  for other startup handlers (on_event). I checked by reading lines 1–110 of app.py
+  and the Dockerfile, which show none. The full suite passing also suggests passing
+  lifespan= did not disable any existing handler.'
+created: 2026-09-29T18:26:41+0200
+max_diff_lines: 300
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0033
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: Per-IP rate limiting returning 429 past the limit, with a tested lifespan wiring
+  that resets on exit (retry of parked T-0029)
+why: G5's definition of done requires that rate limiting returns 429 past the limit
+  and that this is tested. app.py has no limiter today. Parked T-0029 was accepted
+  except that its production lifespan wiring was untested and leaked the limiter onto
+  the global app after exit.
+acceptance:
+- uv run pytest -q tests/test_ratelimit.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/ratelimit.py
+- src/pendel/app.py
+- tests/test_ratelimit.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- pyproject.toml
+- uv.lock
+rank: 1
+merged_sha: 7276d1b
+merged_at: 2026-09-29T23:12:49+0200

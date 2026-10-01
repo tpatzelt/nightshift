@@ -1,0 +1,76 @@
+depends_on: []
+new_tests_required: true
+attempts: 2
+notes:
+- Use httpx only (already a dependency); do not add dependencies.
+- 'Expose small functions or methods: locations(query), departures(stop_id, when,
+  duration), journeys(from_id, to_id, departure), trip(trip_id). Base URL comes from
+  env PENDEL_HAFAS_BASE_URL, default https://v6.bvg.transport.rest.'
+- Add an in-memory TTL cache keyed by URL+params. On HTTP 429/503, back off with exponential
+  delay (inject the sleep function so tests don't sleep) and give up after a small
+  bounded number of retries. Never loop live calls.
+- 'Test harness: build a fixture-replay httpx.MockTransport that maps request paths
+  to JSON files under tests/fixtures/hafas/. In tests/conftest.py, add an autouse
+  guard that fails any test that opens a real socket (e.g. monkeypatch socket.socket.connect).'
+- Tests in this task may use tiny hand-made JSON to exercise the cache and backoff.
+  Real recorded fixtures come in T-0002.
+- 'attempt 1: reviewer said revise: Overall the work is solid. The client serves G1/M1,
+  uses httpx only, stays within allowed_paths and has no scope creep. Backoff is bounded
+  (0.5+1+2s). The backoff, cache and query-building tests are real: reverting the
+  code would make them fail. Four issues need fixing before approval. (1) The offline
+  network guard has no test. The task and the charter (''a test that touches the network
+  is a failing test'') make this guard central to the harness. The worker checked
+  it with a scratch test and then deleted that test, so today the autouse fixture
+  in tests/conftest.py could be '
+- 'attempt 2: reviewer said revise: Most of this is right. The client serves G1/M1
+  and uses only httpx. All 8 files are inside allowed_paths. Backoff is bounded (0.5/1/2s,
+  injected sleep). The backoff and TTL tests would fail if the code were reverted,
+  and the new guard test fixes issue (1) from attempt 1. I could not recover issues
+  (2)-(4) from attempt 1: the note is cut off at the source too (in both /plan/backlog/T-0001.yaml
+  and .nightshift/TASK.md), so I reviewed the change on its own terms. Please fix
+  the following:
+
+  (A) The cache never removes anything. `_cache` only grows. A departures call with
+  `when'
+created: 2026-09-29T08:07:17+0200
+max_diff_lines: 500
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0001
+project: mein-pendel
+charter_goal: G1
+roadmap_ref: M1
+title: HAFAS REST client with caching, 429 backoff and offline fixture-replay test
+  harness
+why: G1's engine needs departures, remarks and journeys from v6.bvg.transport.rest.
+  The charter requires the production code to cache and back off because the public
+  instance allows about 100 req/min, and it requires tests to be fully offline, replaying
+  HTTP from tests/fixtures/**. The repo so far has only a package stub.
+acceptance:
+- uv sync
+- uv run pytest -q tests/test_hafas_client.py
+- uv run pytest -q
+- uv run python -c "import pendel.hafas"
+allowed_paths:
+- src/pendel/hafas/**
+- tests/test_hafas_client.py
+- tests/conftest.py
+- tests/fixtures/hafas/**
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- pyproject.toml
+- uv.lock
+rank: 0
+park_reason: 'reviewer said revise: Most of this is right. The client serves G1/M1
+  and uses only httpx. All 8 files are inside allowed_paths. Backoff is bounded (0.5/1/2s,
+  injected sleep). The backoff and TTL tests would fail if the code were reverted,
+  and the new guard test fixes issue (1) from attempt 1. I could not recover issues
+  (2)-(4) from attempt 1: the note is cut off at the source too (in both /plan/backlog/T-0001.yaml
+  and .nightshift/TASK.md), so I reviewed the change on its own terms. Please fix
+  the following:
+
+  (A) The cache never removes anything. `_cache` only grows. A departures call with
+  `when'

@@ -1,0 +1,111 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- Do NOT run docker or docker compose. The NIGHTSHIFT guard blocks every Docker call
+  in this sandbox. The charter's `docker build .` and `docker compose -f deploy/compose.yaml
+  config` checks stay unverified until a human runs them. Say so in DEPLOY.md and
+  in your followups.
+- 'Keep everything the T-0032 reviewer accepted. Dockerfile: pin the base image to
+  a real patch version tag, never :latest. Install with `uv sync --locked --no-dev`
+  and run as a non-root USER. Set PENDEL_DATA_DIR=/data. Add a HEALTHCHECK that calls
+  http://127.0.0.1:8000/healthz with python urllib. CMD calls the venv binaries directly
+  (/app/.venv/bin/uvicorn pendel.app:app --host 0.0.0.0 --port 8000), never a bare
+  `uv run`. If you pin uv by a version tag, the comment must say ''version tag'',
+  not ''digest''.'
+- 'deploy/compose.yaml: two services from ghcr.io/tpatzelt/mein-pendel:latest. ''web''
+  runs uvicorn and ''scheduler'' runs /app/.venv/bin/python -m pendel.runner. Both
+  use `env_file: .pendel.env` and the volume /opt/dockerdata/pendel:/data. Only web
+  joins the external network caddy_network. The scheduler gets `healthcheck: {disable:
+  true}`. No `ports:` key anywhere.'
+- 'Fix (1) from the T-0032 review: never ship `VAR=` with an empty value for a variable
+  whose code does not treat the empty string as unset. PENDEL_CHECK_LEAD_MIN must
+  be either commented out (`# PENDEL_CHECK_LEAD_MIN=30`) or a real integer. Treat
+  PENDEL_RATE_LIMIT_PER_MIN (read by the rate limiter from T-0033) the same way: commented
+  out with an integer example. The optional channel vars PENDEL_TELEGRAM_BOT_TOKEN,
+  PENDEL_TELEGRAM_BOT_USERNAME and PENDEL_NTFY_URL should also be commented out rather
+  than empty, so copying the example enables no channel. PENDEL_DATA_DIR=/data may
+  be set. Also cover PENDEL_HAFAS_BASE_URL. No real tokens, domains or LAN IPs anywhere.'
+- 'Fix (2) from the T-0032 review: the env file lives at deploy/.pendel.env, next
+  to compose.yaml, which is where `env_file: .pendel.env` resolves. It must never
+  go inside /opt/dockerdata/pendel, because that is the data volume mounted into both
+  containers. .gitignore already ignores `.*.env` and allows `.*.env.example`. DEPLOY.md
+  steps must be numbered and consistent: copy deploy/.pendel.env.example to deploy/.pendel.env,
+  edit it, create /opt/dockerdata/pendel owned by the container''s UID, then run `docker
+  compose -f deploy/compose.yaml up -d`. Also give the exact Caddy route block (placeholder
+  domain pendel.example.org, reverse_proxy web:8000), the cloudflared ingress lines
+  (placeholder hostname), and state that the homelab repo itself is not edited (charter
+  non-goal).'
+- 'Workflow .github/workflows/ci.yaml: on push to main, set up uv, run `uv run pytest
+  -q`, log in to ghcr.io with GITHUB_TOKEN, then build and push ghcr.io/tpatzelt/mein-pendel:latest
+  and :sha-<short sha>. Pin actions to major versions and set `permissions: packages:
+  write`.'
+- 'tests/test_deploy.py uses stdlib text checks only. Do not add PyYAML. Keep the
+  T-0032 assertions: non-root USER; the HEALTHCHECK instruction, including continuation
+  lines, contains /healthz and urllib; no FROM uses :latest or lacks a tag; CMD and
+  the compose commands never use a bare `uv run`; the compose scheduler disables its
+  healthcheck; compose contains caddy_network, `external: true`, /opt/dockerdata/pendel
+  and env_file, and has no `ports:`; the workflow names ghcr.io/tpatzelt/mein-pendel:latest
+  and sha-; the YAML files contain no tabs.'
+- New tests for the two fixes. (a) Parse every non-comment `KEY=VALUE` line in the
+  env example. Any key in {PENDEL_CHECK_LEAD_MIN, PENDEL_RATE_LIMIT_PER_MIN} that
+  is present must have a value that parses with int() and is > 0. No uncommented line
+  may be `PENDEL_...=` with an empty value, except for keys the code reads with an
+  `or` fallback. The simplest way to satisfy this is to have none. (b) Every PENDEL_[A-Z_]+
+  name found in src/pendel/**/*.py appears in the env example, either set or commented,
+  plus PENDEL_RATE_LIMIT_PER_MIN, so the test stays green whether or not T-0033 has
+  landed. (c) DEPLOY.md mentions deploy/.pendel.env, and no line of DEPLOY.md places
+  .pendel.env under /opt/dockerdata. Replace the weak `'not' in lowered` check with
+  an assertion on a specific phrase, for example 'homelab repo' together with 'not
+  edited' or 'no changes'. Drop test_deploy_doc_and_files_exist, which only repeated
+  the acceptance test -f checks.
+- 'Assumption, recorded conservatively: full YAML validity and the Docker checks are
+  left to the human, because Docker is blocked and PyYAML is not a dependency.'
+created: 2026-09-29T23:00:36+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0035
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: Dockerfile, deploy/compose.yaml, deploy/.pendel.env.example, CI workflow and
+  DEPLOY.md with a static structure test (retry of parked T-0032 with the reviewer's
+  two fixes)
+why: G4 needs a non-root Dockerfile with a healthcheck, a compose file that follows
+  the homelab conventions (external caddy_network, /opt/dockerdata/pendel, pinned
+  images, env_file secrets, no host ports), a workflow that runs the tests and publishes
+  ghcr.io/tpatzelt/mein-pendel:latest and sha-<short>, and a DEPLOY.md. None of these
+  files exist in the repo. Parked T-0032 was accepted except for two operational bugs.
+  First, `PENDEL_CHECK_LEAD_MIN=` shipped empty, and scheduler._lead_minutes_from_env
+  runs int('') on it and crashes. Second, DEPLOY.md put the env file at a different
+  path from the one compose's env_file resolves, and that path was inside the data
+  volume.
+acceptance:
+- test -f Dockerfile
+- test -f deploy/compose.yaml
+- test -f deploy/.pendel.env.example
+- test -f .github/workflows/ci.yaml
+- test -f DEPLOY.md
+- uv run pytest -q tests/test_deploy.py
+- uv run pytest -q
+allowed_paths:
+- Dockerfile
+- .dockerignore
+- deploy/compose.yaml
+- deploy/.pendel.env.example
+- .github/workflows/ci.yaml
+- DEPLOY.md
+- tests/test_deploy.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: 2335f4c
+merged_at: 2026-09-29T23:04:59+0200

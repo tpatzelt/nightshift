@@ -1,0 +1,95 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- 'Keep the existing README intro and the uv sync / uv run pytest -q block. Add short
+  sections: Run locally (uvicorn pendel.app:app, python -m pendel.runner, python -m
+  pendel.telegram_poll, each via `uv run`), Configuration, Tests, Deployment (link
+  DEPLOY.md).'
+- 'Configuration: list every variable that appears in deploy/.pendel.env.example (currently
+  PENDEL_DATA_DIR, PENDEL_CHECK_LEAD_MIN, PENDEL_HAFAS_BASE_URL, PENDEL_NTFY_URL,
+  PENDEL_RATE_LIMIT_PER_MIN, PENDEL_TELEGRAM_BOT_TOKEN, PENDEL_TELEGRAM_BOT_USERNAME,
+  FORWARDED_ALLOW_IPS). Give each a one-line meaning. Read the source (src/pendel/*.py,
+  the env example) for defaults and validation rules. Do not invent defaults or behaviour
+  the code does not have.'
+- No real domains, tokens, LAN IPs or personal data. Use obvious placeholders only.
+- 'Tests: say that `uv run pytest -q` is fully offline, that HTTP is replayed from
+  tests/fixtures/hafas/**, and that the current engine fixtures are synthetic (file
+  names start with synthetic_). Do not claim that recorded real fixtures exist.'
+- tests/test_readme.py must stay offline and only read files. It parses the variable
+  names from deploy/.pendel.env.example (both commented `# NAME=` and plain `NAME=`
+  lines) and asserts that each one appears in README.md. It also asserts that README.md
+  contains `pendel.app:app`, `pendel.runner`, `pendel.telegram_poll` and `DEPLOY.md`.
+  The test must fail against the current 11-line README.
+- Do not edit the env example, DEPLOY.md or any source file. If one of them looks
+  wrong, mention it in your report as a followup instead.
+- 'attempt 1: reviewer said revise: The scope is right: only README.md and tests/test_readme.py
+  changed. The test reads deploy/.pendel.env.example and checks every variable in
+  it, whether commented or not. It also checks for the three entrypoints and DEPLOY.md,
+  and it would fail against the old 11-line README. Most of the README matches the
+  code: the defaults 30 and 60 with positive-int validation, the v6.bvg.transport.rest
+  default, the ntfy and Telegram no-op behaviour when unset, the poller logging and
+  exiting without a token, `--once` and `/healthz`. The task note says ''Do not invent
+  defaults or behaviour the code does not have'', and two claims break it.
+
+  (1) The PENDEL_DATA_DIR row says ''the process fails to start without it'', and
+  Run locally says it ''must be set for all three''. The code does not do this. db.data_dir()
+  reads os.environ[''PENDEL_DATA_DIR''] only when db.connect() is called. In app.py
+  that call is in the per-request get_db dependency (app.py:139), and the lifespan
+  does not touch the DB. So `uv run uvicorn pendel.app:app` starts and serves /healthz
+  without the variable, and fails only on routes that use the DB. telegram_poll.main()
+  also returns before db.connect() when PENDEL_TELEGRAM_BOT_TOKEN is unset. Reword
+  the row to something the code supports, for example: ''Required, no default. Any
+  code path that opens the database raises KeyError if it is unset.'' Also soften
+  ''must be set for all three'' to match.
+
+  (2) The Tests section says ''The current fixtures are synthetic (file names start
+  with synthetic_)''. tests/fixtures/hafas/harness/example.json does not follow that
+  pattern. Either scope the sentence to the engine fixtures, as the task note does,
+  or make it accurate for all fixtures.
+
+  Optional nit: the env example says PENDEL_RATE_LIMIT_PER_MIN is ''used once the
+  rate limiter lands'', but the limiter already exists (ratelimit.py, app lifespan).
+  That is a stale comment in a protected file, so report it as a follow-up and do
+  not edit it. No secrets, real domains, LAN IPs or new dependencies were added. The
+  only ''Tim''s homelab'' mention matches wording already in the charter.'
+created: 2026-09-30T05:49:19+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0047
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'README: document how to run the web app, scheduler runner and Telegram poller
+  locally, every PENDEL_* env var, and the offline-fixture test policy, with a test
+  that keeps it in sync with deploy/.pendel.env.example'
+why: README.md is 11 lines. It only shows `uv sync` and `uv run pytest -q`. An operator
+  following G4 cannot learn from it that the app runs as `uv run uvicorn pendel.app:app`,
+  that the scheduler is `python -m pendel.runner`, that the poller is `python -m pendel.telegram_poll`,
+  or which environment variables exist. The charter requires that configuration comes
+  from environment variables documented in `.pendel.env.example`, and a README that
+  mirrors that list keeps the documentation truthful. This is documentation within
+  G4 and counts as allowed idle work while G1 stays blocked on live recording.
+acceptance:
+- test -f README.md
+- uv run pytest -q tests/test_readme.py
+- uv run pytest -q
+allowed_paths:
+- README.md
+- tests/test_readme.py
+protected_paths:
+- docs/CHARTER.md
+- src/**
+- deploy/**
+- DEPLOY.md
+- Dockerfile
+- .github/**
+- tests/fixtures/**
+- tests/conftest.py
+- pyproject.toml
+- uv.lock
+- .gitignore
+merged_sha: 7373c01
+merged_at: 2026-09-30T05:53:23+0200

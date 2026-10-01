@@ -1,0 +1,59 @@
+depends_on:
+- T-0051
+new_tests_required: true
+attempts: 0
+notes:
+- Test-only task in tests/test_design.py. Do not edit templates or app.py. If a status
+  renders without a label, report blocked in followups.
+- Do NOT seed HAFAS fixtures or go through the /today route; tests/test_web_today.py
+  already covers the route (G3). Instead build one item per status with pendel.app._status_item(commute_id,
+  commute, t, status, message=None), where t comes from pendel.i18n for 'de' and 'en'.
+  Check pendel/i18n.py for the translate helper's exact name and signature. Then render
+  'today.html' with pendel.app.templates.env.get_template(...).render(...), passing
+  the context names today.html and base.html use (read both templates and the /today
+  handler around app.py:855 for the exact keys, e.g. t, items, has_user, lang).
+- Parametrize over status in ('ok','disrupted','paused','failed','inactive') and language
+  in ('de','en'). With a regex, find the element whose class starts with 'status-'.
+  Strip the <span aria-hidden="true">…</span> and the tags, and assert the remaining
+  text equals the i18n value today_status_<status> (e.g. 'Prüfung fehlgeschlagen',
+  'Checking failed') and is non-empty.
+- 'Also add one static check: every template under src/pendel/templates that contains
+  ''class="status-'' also contains ''status_label'' in that same template (guards
+  future pages).'
+created: 2026-10-01T00:45:22+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0052
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'G4 done test, part 2: status markup on /today carries a visible text label
+  for ok, disrupted, paused, failed and inactive, in DE and EN'
+why: 'G4 definition of done: a test checks that status markup carries a text or icon
+  label, not only a class, so status is never shown by color alone. today.html renders
+  <p class="status-{{ item.status }}"> with an aria-hidden icon and item.status_label.
+  No design test asserts that the label is present for every status. Re-issue of the
+  second half of parked T-0048, narrowed to rendering the template directly.'
+acceptance:
+- uv run pytest -q tests/test_design.py
+- uv run pytest -q
+allowed_paths:
+- tests/test_design.py
+protected_paths:
+- src/**
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 3
+merged_sha: 7d88b1d
+merged_at: 2026-10-01T05:07:56+0200

@@ -1,0 +1,70 @@
+depends_on:
+- T-0037
+- T-0053
+new_tests_required: true
+attempts: 1
+notes:
+- Tests only. Do not change production code. If a check fails because of a real bug,
+  report it in followups and report blocked.
+- Run one Scheduler.tick over the real recording departures_cancellation.json (or
+  departures_warning.json) via httpx.MockTransport. The commute has origin/destination
+  names, a linked ntfy channel and a FakeChannel. Assert the single message contains
+  the commute name, the line, the planned HH:MM, the reason and '/today'. Then tick
+  with an undisturbed response and assert the resolved message names what cleared.
+- Also cover unlink (only that channel is removed) and send test message (exactly
+  one message through the fake) end to end through TestClient. The test-message route
+  is POST /notifications/channels/{id}/test from T-0053. Override pendel.app.get_channels
+  via app.dependency_overrides with a FakeChannel dict and clear it afterwards.
+- 'attempt 1: reviewer said revise: The diff touches only the test file, keeps production
+  code unchanged and runs offline. The unlink and send-test-message tests are good.
+  Two assertions in the scheduler test are too weak to prove the G5 requirements,
+  though. (1) The task says to ''assert the resolved message names what cleared''.
+  In src/pendel/tracker.py, format_resolved_message has kind-specific phrases (e.g.
+  ''Ausfall auf {line} behoben.'' / ''Cancellation on {line} resolved.'') and falls
+  back to the generic ''Störung auf {line} behoben.'' / ''Disruption on {line} resolved.''.
+  The test only checks for ''behoben'', ''resolved'' and ''S46'', so it still passes
+  if the kind-specific phrasing breaks or is reverted to the generic one. Assert the
+  exact phrases ''Ausfall auf S46 behoben'' and ''Cancellation on S46 resolved''.
+  (2) The commute name is built as ''origin → destination'' (tracker.py:155), but
+  the test only checks for ''Westkreuz'', the origin stop name. That passes even if
+  the name or destination is dropped. Assert the full ''Westkreuz → Hohenzollerndamm''
+  in both the disruption and the resolved message. Smaller points: commute_id is assigned
+  but never used. The destination ID ''900000200002'' has 12 digits, while the charter
+  says real stop IDs have 9 (harmless here because /journeys is stubbed, but use a
+  real 9-digit ID or the one from the existing recorded tests). Optionally, in the
+  unlink test, also assert the redirect location, the same way the test-message test
+  does.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0040
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'G5 definition-of-done test: scheduler tick to FakeChannel message, unlink
+  and test message'
+why: 'G5 definition of done: tests with the fake channels assert that the notification
+  text contains commute name, line, planned time, reason and a link to /today; that
+  unlink removes only that channel; and that ''send test message'' sends exactly one
+  message.'
+acceptance:
+- test -f tests/test_notification_flow.py
+- uv run pytest -q tests/test_notification_flow.py
+- uv run pytest -q
+allowed_paths:
+- tests/test_notification_flow.py
+protected_paths:
+- src/**
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 1
+merged_sha: 4a9fbce
+merged_at: 2026-10-01T05:22:11+0200

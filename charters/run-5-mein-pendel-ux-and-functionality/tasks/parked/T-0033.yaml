@@ -1,0 +1,88 @@
+depends_on:
+- T-0032
+new_tests_required: true
+attempts: 2
+notes:
+- 'Assumption: editing keeps the saved origin and destination. The visitor changes
+  lines, weekdays, window and delay threshold. To use other stops, they create a new
+  commute via /stops (link to it from the edit page).'
+- GET /commutes/{commute_id}/edit renders the setup screen-3 form (reuse commute_new.html
+  and its line-checkbox code, fetched from the origin's departures via _line_choices_for_origin).
+  It is prefilled with the saved values. A saved line missing from today's choices
+  still shows as a checked checkbox. The form posts to POST /commutes/{commute_id}.
+- POST /commutes/{commute_id} validates like POST /commutes, including crossing-midnight
+  windows (T-0031). It keeps the stored stop ids/names and the paused flag, calls
+  db.update_commute scoped to the uid cookie's user, and redirects 303 to /commutes.
+  Invalid input re-renders with status 400 and role=alert. Another user's id or an
+  unknown id returns 404 and changes nothing.
+- Add an 'Bearbeiten'/'Edit' link per commute on commutes.html.
+- 'Tests: the edit form shows the saved values checked. A valid edit changes only
+  that commute. An invalid edit returns 400 and changes nothing. Another user''s commute
+  cannot be edited. No 9-digit ID appears as visible text on the page (hidden inputs
+  are not needed; use the commute id in the URL). DE+EN.'
+- "attempt 1: gate failures:\n  - worker reported status=None, not 'done'"
+- 'attempt 2: reviewer said revise: The routes, ownership scoping (404 and no change
+  for an unknown id, another user''s commute or a missing cookie), keeping the paused
+  flag, the 303 redirect, the 400 response with role=alert, the Edit/Bearbeiten link
+  and the DE/EN strings all look correct. The tests for these are real. Two things
+  in the task spec are not met: (1) The task note says: ''No 9-digit ID appears as
+  visible text on the page (hidden inputs are not needed; use the commute id in the
+  URL)''. No new test checks this. The file already has a pattern for it: tests/test_web_commutes.py:689
+  asserts `_NINE_DIGIT_RE.search(response.text) is None`. The edit page would fail
+  that check, because commute_new.html still renders `<input type="hidden" name="origin_stop_id">`
+  and `destination_stop_id` with the 9-digit IDs when commute_id is set. The edit
+  POST ignores those fields anyway. Fix: in commute_new.html, wrap the four origin/destination
+  hidden inputs in `{% if not commute_id %}`. The edit handlers then need not pass
+  origin_stop_id or destination_stop_id to the template. Then add `assert _NINE_DIGIT_RE.search(response.text)
+  is None` for the GET edit form in DE and EN, and for the 400 re-render. The current
+  `''name="commute_id"'' not in response.text` assertion does not check this requirement.
+  (2) Minor: test_invalid_edit only tries an out-of-range weekday. Add one more invalid
+  case, such as no lines selected or a malformed time like ''25:00'', so the shared
+  validation path is checked for more than one field. Optional: the edit screen uses
+  the create-screen heading switch through `commute_id` truthiness. That works because
+  ids start at 1, but `commute_id is defined` would be safer. No security or dependency
+  concerns found.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: parked
+id: T-0033
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'My commutes: edit one commute''s lines, days, window and delay threshold'
+why: 'G2: each saved commute can be edited individually. db.update_commute exists
+  (T-0007), but there is no edit form or route.'
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/commute_new.html
+- src/pendel/templates/commutes.html
+- src/pendel/i18n.py
+- tests/test_web_commutes.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 4
+park_reason: 'reviewer said revise: The routes, ownership scoping (404 and no change
+  for an unknown id, another user''s commute or a missing cookie), keeping the paused
+  flag, the 303 redirect, the 400 response with role=alert, the Edit/Bearbeiten link
+  and the DE/EN strings all look correct. The tests for these are real. Two things
+  in the task spec are not met: (1) The task note says: ''No 9-digit ID appears as
+  visible text on the page (hidden inputs are not needed; use the commute id in the
+  URL)''. No new test checks this. The file already has a pattern for it: tests/test_web_commutes.py:689
+  asserts `_NINE_DIG'

@@ -1,0 +1,127 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- Add GET /impressum, /datenschutz and /about. Render them through base.html with
+  the same language handling as '/'. Use one shared helper such as _render_static_page(request,
+  template) instead of three copied handlers.
+- 'Use clearly marked placeholders only: [NAME], [ADRESSE] (the same token in DE and
+  EN), [E-MAIL], and a Ko-fi link to https://ko-fi.com/[PLACEHOLDER]. No real names,
+  addresses, domains or emails (charter constraint).'
+- 'Impressum heading: DE ''Angaben gemäß § 5 DDG''; EN ''Information according to
+  § 5 DDG (German Digital Services Act)''. Do not cite the TMG.'
+- 'Datenschutz must describe the actual data model and invent nothing. Read src/pendel/migrations/0001_initial.sql
+  and app.py. Cover: the HttpOnly opaque uid cookie set on the first save; saved commutes
+  (including delay_threshold_min); the optional Telegram chat id and ntfy topic; notification
+  state; no email and no name; no trackers; the lang cookie; one-click delete via
+  POST /me/delete, which removes every row and the cookie; stop and departure queries
+  sent to the VBB/BVG HAFAS REST API; and, if notifications are set up, delivery through
+  the third-party services Telegram and/or the ntfy server the user chose (DE and
+  EN).'
+- 'IP sentence (the reason attempt 2 failed). src/pendel/ratelimit.py keeps key ->
+  (window_start, count) in an in-memory OrderedDict. Stale entries are never purged;
+  an entry leaves only through LRU eviction past _MAX_TRACKED_KEYS or a process restart.
+  Say exactly that, e.g. DE: ''Zum Schutz vor Missbrauch verarbeitet die App deine
+  IP-Adresse ausschließlich im Arbeitsspeicher des Servers, zusammen mit einem Anfragezähler;
+  sie wird nicht in der Datenbank gespeichert und geht spätestens bei einem Neustart
+  des Servers verloren.'' Use the same meaning in EN. Do NOT claim a one-minute retention,
+  and do NOT claim the IP is never logged: uvicorn''s default access log and the reverse
+  proxy may log it. Make no promise about logs. Do not edit ratelimit.py.'
+- About says the app is free, has no ads and no tracking, and links the optional Ko-fi
+  placeholder.
+- The footer in base.html links all three pages on every page.
+- 'Tests with TestClient: each route returns 200 in DE and EN; the placeholders are
+  present in both languages; the footer on ''/'', ''/today'' and ''/stops'' links
+  to /impressum, /datenschutz and /about (reuse the existing fixtures and replay pattern
+  for /stops and /today); ''§ 5 DDG'' is present and ''TMG'' is absent; the Telegram/ntfy
+  third-party sentence is present in DE and EN; the IP sentence says memory-only,
+  not stored in the database, lost at restart; the EN page does not contain ''logged''
+  and the DE page does not contain ''protokolliert''; each page has viewport meta
+  and no fixed width above 360px (reuse the existing 360px structure-test pattern).'
+- 'attempt 1: reviewer said revise: Almost everything is right: routes go through
+  one shared _render_static_page helper, language handling matches ''/'', the footer
+  is in base.html, the placeholders are correct, the Impressum cites § 5 DDG and not
+  the TMG, the IP sentence matches ratelimit.py, and no protected paths were touched.
+  The legal page still makes a claim the code doesn''t back, and one test is too weak.
+
+
+  1) BLOCKER, untrue legal claim (the same kind of problem that parked T-0034): datenschutz_cookies_text
+  calls the uid a ''nicht personenbezogene Kennung'' / ''non-personal identifier''.
+  Under the GDPR, a persistent random ID tied to stored commutes, a Telegram chat
+  id and an ntfy topic is pseudonymous personal data, not non-personal data. The task
+  says ''invent nothing''. Fix: drop ''nicht personenbezogene'' / ''non-personal''
+  and say only ''eine zufällige, undurchsichtige Kennung (uid)'' / ''a random, opaque
+  identifier (uid)''.
+
+
+  2) Weak test: test_datenschutz_mentions_third_party_channels_de/_en only check that
+  ''Telegram'' and ''ntfy'' appear on the page. Both words already appear in datenschutz_data_text,
+  so the tests would still pass if the third-party delivery sentence were deleted.
+  Assert something only that sentence contains: DE ''Drittanbieter'' and EN ''third-party
+  services'', or better the whole sentence.
+
+
+  3) Accuracy, should fix: the ntfy server is set by the operator through PENDEL_NTFY_URL
+  (notify/channel.py). Users only enter a topic, so ''den von dir gewählten ntfy-Server''
+  / ''the ntfy server you selected'' is wrong. The task note says ''the ntfy server
+  the user chose'', but the code decides here. Suggested wording: ''den vom Betreiber
+  konfigurierten ntfy-Server (an das von dir gewählte Topic)'' / ''the operator-configured
+  ntfy server (to the topic you chose)''. Record the assumption.
+
+
+  4) Minor, optional: the task asks for one-click delete via POST /me/delete. The
+  page names the button but not the endpoint, which is fine for readers. The channels
+  table also stores a Telegram link_token while linking is pending; ''notification
+  state'' plus the chat id covers this only loosely. Consider adding ''ein einmaliges
+  Verknüpfungs-Token'' / ''a one-time linking token''.
+
+
+  No scope creep and no new dependencies or secrets. Both acceptance gates pass: 25
+  tests in test_web_legal.py and 260 in the full suite.'
+created: 2026-09-29T23:22:01+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0038
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: Impressum, Datenschutzerklärung and About pages with placeholders, linked in
+  the footer, with a truthful IP-address sentence (retry of parked T-0034)
+why: G5's definition of done requires the legal pages to exist and be linked in the
+  footer, and the About page to say the app is free and link an optional Ko-fi placeholder.
+  None of these routes exist yet. T-0034 was parked after attempt 2 with everything
+  accepted except the Datenschutz IP sentence, which claimed a retention period and
+  a no-logging guarantee that the code does not support.
+acceptance:
+- uv run pytest -q tests/test_web_legal.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/i18n.py
+- src/pendel/templates/base.html
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- src/pendel/templates/about.html
+- tests/test_web_legal.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/pendel/engine.py
+- src/pendel/tracker.py
+- src/pendel/db.py
+- src/pendel/scheduler.py
+- src/pendel/ratelimit.py
+- src/pendel/notify/**
+- src/pendel/hafas/**
+- src/pendel/migrations/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- deploy/**
+rank: 2
+merged_sha: 62bf17c
+merged_at: 2026-09-29T23:40:49+0200

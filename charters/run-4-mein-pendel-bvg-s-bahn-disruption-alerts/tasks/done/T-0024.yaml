@@ -1,0 +1,95 @@
+depends_on: []
+new_tests_required: true
+attempts: 1
+notes:
+- 'HARD RULE: never send a request to api.telegram.org or any ntfy server, not even
+  to test. Do not create a bot token. Adapters take an injected httpx.Client. Tests
+  use only httpx.MockTransport or FakeChannel, and they assert the request URL and
+  body that would have been sent.'
+- 'Package src/pendel/notify/ exports: Channel, a Protocol with send(target: str,
+  text: str) -> None. TelegramChannel reads its token from env PENDEL_TELEGRAM_BOT_TOKEN
+  or a constructor argument and calls POST https://api.telegram.org/bot<token>/sendMessage
+  with JSON {chat_id, text}. NtfyChannel reads its server from env PENDEL_NTFY_URL
+  or a constructor argument, takes the topic as target, and POSTs the text as the
+  body. FakeChannel appends (target, text) to a public list `sent`. ChannelSendError
+  is also exported.'
+- If a required env var or argument is missing, the real adapter raises a clear configuration
+  error. There is never a default public ntfy server and never a default token.
+- 'FIX 1 (the security finding that caused the revise): wrap every HTTP call in both
+  adapters in try/except httpx.HTTPError and re-raise ChannelSendError(''telegram
+  send failed: HTTP 403'') or similar. The message holds only the channel kind plus
+  the status code or exception type name. It must never hold the URL or the token.
+  Use `raise ... from None` so the original exception is not chained. Add a MockTransport
+  test that returns 403 and asserts the fake token string is in neither str(exc) nor
+  repr(exc), and that exc.__cause__ is None and exc.__suppress_context__ is True.
+  Add one more test for a transport error: a MockTransport handler that raises httpx.ConnectError
+  whose message contains the URL.'
+- 'FIX 2: NtfyChannel validates the topic against ^[A-Za-z0-9_-]{1,64}$ and raises
+  ValueError otherwise, before any request is built. Test topics that contain ''/'',
+  ''?'', ''#'' and the empty string.'
+- Attempt 1 of T-0007 failed the gate for 'diff appears to contain a hard-coded credential'.
+  Do not write token-shaped literals such as digits:alnum strings anywhere. In tests,
+  use an obviously fake value like 'fake-token-for-tests' passed via monkeypatch.setenv
+  or the constructor.
+- Drop the redundant test the T-0007 reviewer flagged, the one where bot_token=None
+  repeats the missing-token test. Keep send() synchronous.
+- 'attempt 1: reviewer said revise: The design is close. It stays within the allowed
+  paths, adds no dependency and no token-shaped literal, and the Telegram 403 and
+  ConnectError tests would fail if the wrapping were removed. I am asking for a revision
+  for these reasons: (1) FIX 2 can be bypassed. The code uses `_NTFY_TOPIC_RE.match`
+  with `^...$`, and in Python `$` also matches just before a trailing newline. I checked
+  this in the sandbox: `NtfyChannel(...).send(''topic\n'', ''x'')` passes validation,
+  builds the request anyway, and then raises `httpx.InvalidURL`. That exception is
+  not an `httpx.HTTPError`, so it escapes the `ChannelSendError` wrapper unwrapped.
+  This breaks both rules: invalid topics must be rejected with ValueError before any
+  request is built, and every HTTP failure must be wrapped. Fix it with `_NTFY_TOPIC_RE.fullmatch(target)`
+  (or end the pattern with `\Z`). Add ''topic\n'' and a 65-character topic to the
+  parametrized invalid-topic test. (2) Some tests only check that nothing is raised.
+  `test_telegram_channel_token_from_env` and `test_ntfy_channel_server_from_env` just
+  assert `channel is not None`. They would still pass if the env value were read and
+  then ignored, for example if the constructor used a different source. Make them
+  send through a MockTransport and assert that the request URL contains the env token
+  or server. The same applies to the constructor-argument variants, which the send
+  tests already cover and so could be merged into them. (3) `test_ntfy_channel_403_raises_channel_send_error`
+  should also assert that FAKE_SERVER is not in str(exc) or repr(exc), matching the
+  no-URL rule. (4) Optional: consider requiring an injected client instead of silently
+  creating a default `httpx.Client()`. The task says adapters ''take an injected httpx.Client''.
+  The default is acceptable if it is documented, but requiring the client is the more
+  conservative choice.'
+created: 2026-09-29T13:21:52+0200
+max_diff_lines: 400
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0024
+project: mein-pendel
+charter_goal: G3
+roadmap_ref: M3
+title: Notification channel interface with Telegram and ntfy adapters and FakeChannel
+  (retry of parked T-0007 with the reviewer's two fixes)
+why: 'G3 says the channel layer must be an interface with fakes in tests, for Telegram
+  and ntfy. Every ready G3 task (T-0008, T-0014 and, through T-0008, T-0009) depends
+  on this layer. It does not exist yet: src/pendel/notify/ is missing because T-0007
+  was parked. So the whole G3 pipeline is blocked until this lands.'
+acceptance:
+- uv run pytest -q tests/test_notify.py
+- uv run python -c "from pendel.notify import Channel, ChannelSendError, FakeChannel,
+  NtfyChannel, TelegramChannel"
+- uv run pytest -q
+allowed_paths:
+- src/pendel/notify/**
+- tests/test_notify.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/engine.py
+- src/pendel/db.py
+- src/pendel/migrations/**
+- src/pendel/hafas/**
+- pyproject.toml
+- uv.lock
+rank: 0
+merged_sha: a78758a
+merged_at: 2026-09-29T13:41:26+0200

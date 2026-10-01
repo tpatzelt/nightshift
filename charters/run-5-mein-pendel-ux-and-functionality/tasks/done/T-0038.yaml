@@ -1,0 +1,96 @@
+depends_on:
+- T-0050
+new_tests_required: true
+attempts: 1
+notes:
+- 'db: include id in list_channels. Add delete_channel(conn, user_id, channel_id)
+  -> bool, scoped to the owner, like delete_commute.'
+- POST /notifications/channels/{channel_id}/unlink deletes only that channel of the
+  uid cookie's user and redirects 303 to /notifications. A foreign or unknown id changes
+  nothing.
+- 'Template: each channel shows a localized kind name (Telegram / ntfy) and a text
+  status, ''Verknüpft''/''Linked'' with the masked target or ''Ausstehend''/''Pending'',
+  plus a no-JS unlink form button whose text or aria-label names the channel. If there
+  are no channels, show a localized empty line.'
+- 'Tests: with a telegram and an ntfy channel, unlinking one leaves the other (in
+  the DB and on the page). Another user''s channel cannot be unlinked. DE+EN. Keep
+  the 360px layout test passing. No request to any messaging service.'
+- 'attempt 1: reviewer said revise: The production code looks right. delete_channel
+  is scoped to the owner with `WHERE id=? AND user_id=?`. list_channels now returns
+  the id. The unlink route checks the uid cookie, treats a foreign or unknown id as
+  a no-op and redirects 303. The template uses a no-JS form with an aria-label that
+  names the channel and has an empty-state line. The DE and EN strings were added.
+  The scope stays within the allowed paths. The problem is the web tests: several
+  pass whether or not the feature works, and the task''s acceptance notes are not
+  actually checked. Please fix the following:
+
+  (1) test_notifications_page_shows_empty_line_when_no_channels asserts `"notifications_channels_empty"
+  not in response.text`. That only checks the i18n key isn''t printed, so it would
+  pass with the change reverted. Assert the localized line instead (''Noch keine Kanäle
+  verknüpft.'' / ''No channels linked yet.''), in both DE and EN. Also check that
+  _seed_user produces a user who has a commute, so the page reaches the else-branch
+  and doesn''t stop at notifications_need_commute.
+
+  (2) test_unlink_removes_only_that_channel checks the page with `"ntfy" in follow_up.text`,
+  but the page always has the ntfy section, so this check is always true. The task
+  requires that the other channel stays ''on the page''. Assert that `data-channel-kind="ntfy"`
+  is present and `data-channel-kind="telegram"` is absent, and that `/notifications/channels/{telegram_id}/unlink`
+  no longer appears while the ntfy unlink action does.
+
+  (3) In test_notifications_page_lists_channels_with_kind_name_and_status, `"Telegram"
+  in response.text` and `"ntfy" in response.text` are always true because both section
+  headings exist. Assert the rendered list items instead, e.g. ''Telegram: Verknüpft:
+  •2345'' or the data-channel-kind li together with its status text. Also assert one
+  unlink form per channel and the aria-label (''Telegram trennen'' / ''Unlink ntfy'').
+
+  (4) The ''Linked'' status is never checked in either language. Add an EN check for
+  ''Linked:'' and a DE check for ''Verknüpft:'', next to the existing Pending/Ausstehend
+  test.
+
+  (5) The unlink tests follow redirects and only assert 200. Use `follow_redirects=False`
+  and assert status 303 with `location == ''/notifications''`, as the task requires.
+  This applies to the success case and to the foreign-id, unknown-id and no-cookie
+  cases.
+
+  The worker''s assumption that the linked status reads ''Linked: <masked>'' is acceptable.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 350
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0038
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'Notifications page: show linked channels with text status and unlink each
+  one'
+why: 'G5: the notifications page shows which channels are linked and lets the visitor
+  unlink each one. It lists channels, but there is no unlink action, and list_channels
+  returns no row id.'
+acceptance:
+- uv run pytest -q tests/test_web_notifications.py tests/test_db.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/db.py
+- src/pendel/templates/notifications.html
+- src/pendel/i18n.py
+- tests/test_web_notifications.py
+- tests/test_db.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 3
+merged_sha: cf2ef74
+merged_at: 2026-10-01T04:55:20+0200

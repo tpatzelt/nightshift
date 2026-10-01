@@ -1,0 +1,72 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- 'GET /stops takes an optional query param origin_stop_id. Without it, behaviour
+  and links stay exactly as they are now: /commutes/new?origin_stop_id=<id>. With
+  it, every result links to /commutes/new?origin_stop_id=<origin>&destination_stop_id=<id>,
+  and the page shows a short DE/EN hint that you are choosing the destination. Add
+  the new i18n keys to both the ''de'' and ''en'' dicts.'
+- The search form in stops.html keeps origin_stop_id as a hidden input, like the existing
+  hidden lang input, so a repeated search stays in destination mode.
+- Build hrefs with Jinja's |urlencode filter or urllib.parse.urlencode. Never concatenate
+  raw query values. Jinja autoescape must stay on. Add a test showing that an origin_stop_id
+  with '&', '"' or '<' cannot inject an attribute or tag.
+- 'commute_new.html: when origin_stop_id is set and destination_stop_id is empty,
+  show a link to /stops?origin_stop_id=<origin> (''Ziel suchen'' / ''Search destination'').
+  Keep the text inputs so typing an ID still works. Do not change POST /commutes or
+  its validation.'
+- GET /commutes/new already reads destination_stop_id from the query (app.py commutes_new_form).
+  Add a test that both IDs are prefilled from the two-step flow.
+- Reuse tests/fixtures/hafas/web/synthetic_locations.json with the existing MockTransport
+  pattern in tests/test_web_stops.py. Add no fixtures, make no live calls, add no
+  dependencies, add no JavaScript.
+- Keep the existing 360px structure tests passing (viewport meta, no fixed widths
+  above 360px). Do not reformat code you are not changing.
+created: 2026-09-30T04:14:57+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0044
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Two-step stop search: after picking an origin, search again and pick the destination
+  by name instead of typing a raw HAFAS stop ID'
+why: 'G2 says a visitor searches stops and saves commutes. Today the /stops result
+  links only prefill origin_stop_id (src/pendel/app.py stops() and templates/stops.html).
+  The destination has to be typed as a raw HAFAS ID (''Ziel-Haltestelle (ID)'' in
+  i18n.py), so a real visitor cannot save a commute by searching. The fix: carry an
+  optional origin_stop_id through /stops, so the second search''s results link to
+  /commutes/new with both IDs filled in. It is a small change inside G2 with no new
+  route, schema or dependency.'
+acceptance:
+- uv run pytest -q tests/test_web_stops.py
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/templates/stops.html
+- src/pendel/templates/commute_new.html
+- src/pendel/i18n.py
+- tests/test_web_stops.py
+- tests/test_web_commutes.py
+protected_paths:
+- docs/CHARTER.md
+- tests/conftest.py
+- tests/test_smoke.py
+- tests/test_harness.py
+- tests/fixtures/**
+- src/pendel/migrations/**
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/hafas/**
+- pyproject.toml
+- uv.lock
+- Dockerfile
+- deploy/**
+- .github/**
+- DEPLOY.md
+merged_sha: '8972965'
+merged_at: 2026-09-30T04:18:31+0200

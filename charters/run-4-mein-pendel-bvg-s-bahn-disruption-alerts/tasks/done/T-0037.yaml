@@ -1,0 +1,72 @@
+depends_on:
+- T-0036
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add a third compose service `telegram` modelled exactly on `scheduler`: same image,
+  env_file .pendel.env, the /opt/dockerdata/pendel:/data volume, `command: ["/app/.venv/bin/python",
+  "-m", "pendel.telegram_poll"]`, `healthcheck: disable: true`, no ports and not on
+  caddy_network. Use `restart: on-failure`, because pendel.telegram_poll exits 0 when
+  PENDEL_TELEGRAM_BOT_TOKEN is unset, and unless-stopped would restart it in a loop.
+  Explain this in a YAML comment.'
+- 'Before writing the proxy config, read the installed uvicorn source: `uv run python
+  -c "import uvicorn, inspect, uvicorn.config as c; print(uvicorn.__version__); print(inspect.getsource(c))"`,
+  and grep uvicorn/main.py for forwarded_allow_ips / FORWARDED_ALLOW_IPS. Confirm
+  that proxy_headers defaults to on, that the FORWARDED_ALLOW_IPS env var is honoured,
+  and whether CIDR ranges are accepted. Document only what the installed version actually
+  does, and state the version in the commit message.'
+- In deploy/.pendel.env.example, add a commented-out FORWARDED_ALLOW_IPS entry with
+  a clearly fake placeholder value (e.g. `# FORWARDED_ALLOW_IPS=changeme-caddy_network-subnet`).
+  Never write a real LAN IP or subnet (charter constraint). Explain that it must be
+  set to the caddy_network subnet, never '*', because other containers on that network
+  could otherwise spoof X-Forwarded-For.
+- 'In DEPLOY.md, add steps: (a) read the subnet with `docker network inspect caddy_network
+  --format ''{{range .IPAM.Config}}{{.Subnet}}{{end}}''` and put it in FORWARDED_ALLOW_IPS;
+  (b) the telegram service only does anything when PENDEL_TELEGRAM_BOT_TOKEN is set,
+  and `docker compose up -d` starts all three services. Keep the existing statement
+  that the homelab repo is not edited.'
+- 'Update the existing test_compose_only_web_joins_caddy_network if it needs to allow
+  the new service (web must still be the only one on caddy_network). Add stdlib text
+  tests: the telegram service exists, runs `pendel.telegram_poll` through /app/.venv/bin/python,
+  disables the healthcheck, has `restart: on-failure`, and has no ports; the env example
+  mentions FORWARDED_ALLOW_IPS only on a commented line and never with value ''*'';
+  DEPLOY.md mentions FORWARDED_ALLOW_IPS and `docker network inspect caddy_network`.'
+- Docker itself is blocked in this sandbox. Do not run docker. `docker compose config`
+  stays a human step, as already documented.
+created: 2026-09-29T23:22:01+0200
+max_diff_lines: 250
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0037
+project: mein-pendel
+charter_goal: G4
+roadmap_ref: M4
+title: 'Compose: telegram poller service, and FORWARDED_ALLOW_IPS so the per-IP limiter
+  sees visitor IPs behind Caddy'
+why: G4's compose file must run everything the app needs. After T-0036, Telegram linking
+  needs a long-running poller process, and compose does not start one. Also, web runs
+  behind Caddy, and uvicorn trusts X-Forwarded-For only from 127.0.0.1 by default.
+  So request.client.host is always Caddy's container IP, and the per-IP limiter (G5)
+  would throttle all visitors together as one client. The deploy files must document
+  how to trust only Caddy's network.
+acceptance:
+- uv run pytest -q tests/test_deploy.py
+- uv run pytest -q
+allowed_paths:
+- deploy/compose.yaml
+- deploy/.pendel.env.example
+- DEPLOY.md
+- tests/test_deploy.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/conftest.py
+- tests/test_smoke.py
+- src/**
+- pyproject.toml
+- uv.lock
+- .github/**
+rank: 1
+merged_sha: 6d07856
+merged_at: 2026-09-29T23:32:43+0200

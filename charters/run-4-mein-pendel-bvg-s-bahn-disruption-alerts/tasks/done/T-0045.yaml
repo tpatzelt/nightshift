@@ -1,0 +1,62 @@
+depends_on: []
+new_tests_required: true
+attempts: 0
+notes:
+- In src/pendel/templates/base.html, add one link to the footer <nav>. For a German
+  page (language == 'de') it points to href="/?lang=en" with the label 'English'.
+  For an English page it points to href="/?lang=de" with the label 'Deutsch'. Give
+  the link a hreflang attribute and a lang attribute naming the target language. Put
+  the labels in i18n.py as a new key (for example 'footer_language_switch') in BOTH
+  the de and en dicts.
+- Do not change app.py. The home route '/' already sets the lang cookie when ?lang=de|en
+  is present, and every other page reads that cookie. Linking to '/' instead of the
+  current path is a deliberate, conservative choice that keeps the diff small.
+- Every template extends base.html and passes 'language' and 't'. Check this rather
+  than assume it. If some template overrides the footer block, leave it alone and
+  say so in your report.
+- Add tests in the new file tests/test_web_language.py using fastapi.testclient.TestClient(pendel.app.app).
+  Check that '/', '/impressum', '/about' and '/stops' (no q, so HAFAS is never called)
+  contain href="/?lang=en" by default (German), and contain href="/?lang=de" and not
+  href="/?lang=en" with ?lang=en. Also check that following the link, client.get('/?lang=en'),
+  sets the lang cookie, and that a later GET /about with that cookie renders <html
+  lang="en">. Clear client cookies between tests.
+- No JS, no new dependency, no fixed widths in CSS (360px layout tests must stay green).
+  Tests must stay offline.
+created: 2026-09-30T04:46:21+0200
+max_diff_lines: 150
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0045
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: Visible DE/EN language switch link in the shared footer, so a visitor can change
+  the UI language without editing the URL
+why: G2 requires a German and English UI. Today the language only comes from ?lang=,
+  a lang cookie or Accept-Language (app.py _language_for). No page shows a visible
+  switch, so a visitor on a German-language phone cannot reach the English UI, or
+  the reverse, without typing a query parameter. The home route already sets the lang
+  cookie when ?lang=de|en is given, so linking to it from the footer in base.html
+  makes the choice stick across every page.
+acceptance:
+- uv run pytest -q tests/test_web_language.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/templates/base.html
+- src/pendel/i18n.py
+- tests/test_web_language.py
+protected_paths:
+- src/pendel/app.py
+- src/pendel/engine.py
+- src/pendel/scheduler.py
+- src/pendel/migrations/**
+- tests/fixtures/**
+- tests/conftest.py
+- deploy/**
+- Dockerfile
+- .github/**
+- pyproject.toml
+- uv.lock
+merged_sha: f4859f5
+merged_at: 2026-09-30T04:48:04+0200

@@ -1,0 +1,67 @@
+depends_on:
+- T-0017
+new_tests_required: true
+attempts: 1
+notes:
+- 'Add fields with defaults so existing Verdict(...) constructions elsewhere keep
+  working: line: str = '''' and planned: datetime | None = None. They describe the
+  primary (highest-priority) event. planned is the Berlin-aware plannedWhen of the
+  departure that produced it. Unaffected verdicts keep ''''/None.'
+- Carry planned on _Event (default None), set it in _departure_disruption_events from
+  the departure being evaluated, and copy it onto the Verdict.
+- 'Tests: a synthetic cancellation and delay give the right line and planned time.
+  An unaffected verdict has line '''' and planned None. The recorded departures_warning.json
+  still evaluates. dataclasses.replace(verdict, reason_de=...) (used by the scheduler)
+  keeps line and planned.'
+- 'attempt 1: reviewer said revise: The engine change is correct and minimal. Verdict
+  gains line='''' and planned=None as defaults. _Event carries planned, and it is
+  set for the cancellation, delay and remark events from the departure''s plannedWhen
+  converted to Berlin time. The primary event''s values are copied onto the Verdict.
+  Diff size and paths are within limits and all gates pass. The new tests would fail
+  if the change were reverted. But the task''s test notes are only partly done, so
+  please add these to tests/test_engine.py: (1) The task asks for a test that dataclasses.replace(verdict,
+  reason_de=...), which scheduler.py:198 uses, keeps line and planned. No such test
+  exists. Add one that builds an affected verdict, calls dataclasses.replace(verdict,
+  reason_de=''x'') and asserts line and planned are unchanged. (2) The remark path
+  (warning, replacement_service) now also passes planned, but no test checks it. Add
+  an assertion that a remark-only event, such as synthetic_warning.json or _departures(remarks=[{type:
+  ''warning'', ...}]), gives line ''S41'' and the expected Berlin planned time. (3)
+  Optional but useful: the task says departures_warning.json still evaluates. Existing
+  recorded tests already cover that, but a line/planned assertion on the recorded
+  RB32 warning case would show the field works on real HAFAS data. The worker''s assumption
+  (astimezone(BERLIN) on the tz-aware plannedWhen) is sound.'
+created: 2026-09-30T17:14:20+0200
+max_diff_lines: 200
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0035
+project: mein-pendel
+charter_goal: G5
+roadmap_ref: M5
+title: 'Engine: Verdict carries the disrupted line and its planned departure time'
+why: 'G5: a notification names the line and planned time of the disruption. Verdict
+  only has kinds, reasons and disruption_key, so the notifier has no planned time.'
+acceptance:
+- uv run pytest -q tests/test_engine.py tests/test_engine_recorded.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+rank: 0
+merged_sha: 837c267
+merged_at: 2026-10-01T00:50:16+0200

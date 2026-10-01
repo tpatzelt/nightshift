@@ -1,0 +1,73 @@
+depends_on:
+- T-0006
+- T-0010
+- T-0023
+new_tests_required: true
+attempts: 0
+notes:
+- 'Add to db.py: add_commute(conn, user_id, commute: pendel.commute.Commute) -> int
+  and list_commutes(conn, user_id) -> list[Commute-with-id or rows]. Use the existing
+  commutes columns. Store lines and weekdays as sorted comma-separated text and window
+  times as HH:MM. Do not add a migration.'
+- GET /commutes/new renders a plain HTML form (no JS) with origin_stop_id, destination_stop_id,
+  lines, weekday checkboxes, window_start, window_end and delay_threshold_min. It
+  may prefill stop ids from query params, and stops.html may link each result to it.
+  POST /commutes validates by building pendel.commute.Commute. On invalid input it
+  re-renders with status 400 and a DE/EN error. On success it redirects with 303 to
+  /.
+- No password account. If the request has no valid `uid` cookie, call db.create_user
+  and set `uid` as HttpOnly, SameSite=Lax and Path=/. A second POST with the same
+  cookie adds a second commute to the same user. An unknown uid cookie value is treated
+  as no cookie.
+- The DB connection comes from a FastAPI dependency using db.connect() (PENDEL_DATA_DIR).
+  Tests override it or set PENDEL_DATA_DIR to tmp_path. Tests are offline, and no
+  HAFAS call is needed.
+- 'Every new user-facing string gets both a DE and an EN entry in i18n.STRINGS. The
+  new page extends base.html, so the viewport meta and the 360px rules still apply.
+  Add a structure test: viewport meta is present and there is no fixed width in style
+  attributes.'
+- 'Tests: GET form 200 in both languages; valid POST gives 303, sets the cookie and
+  inserts one row; a second POST with the cookie gives two rows for the same user;
+  invalid weekday or empty lines gives 400 and no row is inserted.'
+created: 2026-09-29T13:21:52+0200
+max_diff_lines: 450
+timeout_min: 45
+max_turns: 60
+status: done
+id: T-0025
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Save a commute without a password account: GET/POST /commutes/new with an
+  opaque user cookie'
+why: G2's definition of done needs a 'save commute' route with a TestClient test.
+  Visitors save one or more commutes without a password account. db.py has create_user/delete_user
+  and a commutes table but no commute insert/list helpers, and app.py has no commute
+  routes.
+acceptance:
+- uv run pytest -q tests/test_web_commutes.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/app.py
+- src/pendel/db.py
+- src/pendel/i18n.py
+- src/pendel/templates/commute_new.html
+- src/pendel/templates/stops.html
+- tests/test_web_commutes.py
+protected_paths:
+- docs/CHARTER.md
+- .gitignore
+- tests/test_smoke.py
+- tests/conftest.py
+- src/pendel/migrations/**
+- src/pendel/engine.py
+- src/pendel/commute.py
+- src/pendel/hafas/**
+- src/pendel/notify/**
+- src/pendel/tracker.py
+- src/pendel/scheduler.py
+- pyproject.toml
+- uv.lock
+rank: 4
+merged_sha: adac147
+merged_at: 2026-09-29T13:28:50+0200

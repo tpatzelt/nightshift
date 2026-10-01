@@ -1,0 +1,45 @@
+depends_on:
+- T-0031
+- T-0010
+new_tests_required: true
+attempts: 0
+notes:
+- Use Commute.window_containing(now) when it is not None, else today's window_bounds
+  (keeps existing behaviour for times before the window).
+- 'Tests: a synthetic departures dict with a cancelled departure at 00:10 on a 23:30-00:30
+  window, evaluated at 23:50 and at 00:05, is affected in both cases. Add one test
+  on the 2026-10-25 fall-back night.'
+created: 2026-09-30T14:10:12+0200
+max_diff_lines: 250
+timeout_min: 30
+max_turns: 40
+status: done
+id: T-0017
+project: mein-pendel
+charter_goal: G2
+roadmap_ref: M2
+title: 'Engine: evaluate the window containing now, including one that started yesterday'
+why: 'G2: the engine must handle a window crossing midnight. evaluate() uses only
+  today''s window_bounds, so at 00:15 a 23:30-00:30 commute is missed.'
+acceptance:
+- uv run pytest -q tests/test_engine.py tests/test_engine_recorded.py
+- uv run pytest -q
+allowed_paths:
+- src/pendel/engine.py
+- tests/test_engine.py
+protected_paths:
+- src/pendel/migrations/0001_initial.sql
+- src/pendel/migrations/0002_commute_stop_names.sql
+- src/pendel/migrations/0003_commute_paused.sql
+- docs/CHARTER.md
+- Dockerfile
+- deploy/**
+- .github/**
+- pyproject.toml
+- uv.lock
+- src/pendel/templates/impressum.html
+- src/pendel/templates/datenschutz.html
+- tests/fixtures/hafas/recorded/departures_*.json
+- tests/fixtures/hafas/recorded/locations_*.json
+merged_sha: 59dbb70
+merged_at: 2026-09-30T18:47:45+0200
