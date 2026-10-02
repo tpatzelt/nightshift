@@ -605,7 +605,7 @@ def run_agent(role: str, task_id: str, prompt: str, *, model: str,
 
     mount = f"{work_dir}:/work" + ("" if writable else ":ro")
     argv = [
-        "docker", "run", "--rm", "--label", "nightshift=1", "--name", name,
+        "docker", "run", "--rm", "-i", "--label", "nightshift=1", "--name", name,
         "--network", c["net"],
         "--user", "1000:1000",
         "--read-only",
@@ -640,7 +640,9 @@ def run_agent(role: str, task_id: str, prompt: str, *, model: str,
         *[arg for m in (extra_mounts or []) for arg in ("-v", m)],
         c["agent_tag"],
         "timeout", f"{timeout_min}m",
-        "claude", "-p", prompt,
+        # The prompt goes in on stdin: a reviewer prompt carries the whole diff,
+        # and Linux refuses any single argv string over 128 KiB (E2BIG).
+        "claude", "-p",
         "--model", model,
         "--max-turns", str(max_turns),
         "--output-format", "stream-json", "--verbose",
@@ -656,9 +658,22 @@ def run_agent(role: str, task_id: str, prompt: str, *, model: str,
     started = time.time()
     mark_progress(f"{role} {task_id}", force=True)
     with out.log_path.open("w", encoding="utf-8") as sink:
-        proc = subprocess.Popen(argv, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                text=True, env=child_env, bufsize=1)
-        assert proc.stdout is not None
+        proc = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, text=True, env=child_env, bufsize=1)
+        assert proc.stdin is not None and proc.stdout is not None
+
+        def feed(pipe=proc.stdin) -> None:
+            # A thread, so a large prompt can never deadlock against stdout.
+            try:
+                pipe.write(prompt)
+            except BrokenPipeError:
+                pass
+            finally:
+                try:
+                    pipe.close()
+                except BrokenPipeError:
+                    pass
+        threading.Thread(target=feed, daemon=True).start()
         for line in proc.stdout:              # tee: every event is kept on disk
             sink.write(line)
             mark_progress()                   # an agent still streaming is not a hang
@@ -1075,7 +1090,8 @@ def handle_command(cmd: str, state: dict) -> None:
         state.update(paused=True, pause_reason="paused from phone")
         ntfy("Paused. Send resume when you want it going again.", title="NIGHTSHIFT: paused")
     elif cmd == "resume":
-        state.update(paused=False, pause_reason="", consecutive_failures=0)
+        state.update(paused=False, pause_reason="", consecutive_failures=0,
+                     other_error_streak=0)
         STOP_FILE.unlink(missing_ok=True)
         ntfy("Resumed.", title="NIGHTSHIFT: resumed")
     elif cmd == "stop":
