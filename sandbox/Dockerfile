@@ -33,6 +33,21 @@ RUN uv python install ${NS_AGENT_PYTHON} \
 RUN npm install -g @anthropic-ai/claude-code@${NS_CLAUDE_CODE_VERSION} \
  && npm cache clean --force
 
+# Playwright with a headless Chromium, so a worker can look at the pages it styles
+# (`ns-screenshot`). It lives in its own venv outside /work: projects never depend
+# on it. --with-deps pulls Chromium's shared libraries through apt.
+ARG NS_PLAYWRIGHT_VERSION=1.55.0
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN uv venv --python ${NS_AGENT_PYTHON} /opt/playwright \
+ && uv pip install --python /opt/playwright/bin/python playwright==${NS_PLAYWRIGHT_VERSION} \
+ && /opt/playwright/bin/playwright install --with-deps --only-shell chromium \
+ && rm -rf /var/lib/apt/lists/* \
+ && chmod -R a+rX /opt/playwright /opt/ms-playwright
+COPY --chown=root:root --chmod=444 screenshot/ns-screenshot.py /opt/playwright/ns-screenshot.py
+RUN printf '#!/bin/sh\nexec /opt/playwright/bin/python /opt/playwright/ns-screenshot.py "$@"\n' \
+      > /usr/local/bin/ns-screenshot \
+ && chmod 755 /usr/local/bin/ns-screenshot
+
 # Managed policy and guard hook: root-owned, read-only, outside /work so the
 # agent can neither edit them nor delete them.
 COPY --chown=root:root --chmod=444 managed-settings.json /etc/claude-code/managed-settings.json

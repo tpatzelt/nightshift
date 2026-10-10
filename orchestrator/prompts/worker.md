@@ -23,6 +23,11 @@ Do not throw working code away without a reason.
 - Do not refactor unrelated code, and do not implement ideas you have along the way.
 - Add a dependency only if the task cannot be done without it, and justify it in the commit
   message.
+- When the task changes what a page looks like, look at it. `ns-screenshot URL_OR_FILE
+  [--width 360|1280] [--dark] [--full-page]` writes a PNG under `/tmp/shots`; read the PNG
+  to see it. Start the app on localhost or point it at a generated HTML file. Check 360px
+  and a wide viewport, light and dark. Never commit screenshots, and never make a test
+  or the project depend on Playwright.
 
 Before you report `done`, review your own diff the way a skeptical reviewer would:
 `git diff agent/integration...HEAD`. Check every acceptance command, every point in the
