@@ -480,6 +480,9 @@ def finish_active(state: dict, *, reason: str, log=_noop, notify=_noop) -> Path 
                 shutil.copytree(folder, target / name)
         if USAGE_LOG.exists():
             shutil.copy2(USAGE_LOG, target / "usage.jsonl")
+        for path in (plan.LESSONS, plan.FOLLOWUPS):
+            if path.exists():
+                shutil.copy2(path, target / path.name)
         (target / "RESULT.md").write_text(
             result_markdown(run, stats, tips, reason), encoding="utf-8")
     except OSError as exc:
@@ -546,7 +549,7 @@ def _clear_runtime(*, log=_noop) -> None:
         folder.mkdir(parents=True, exist_ok=True)
     # Deliberately not DATA/"STOP": the kill switch is Tim's, and a run that ends
     # while it is set must not quietly rearm the stack by clearing it.
-    for path in (plan.CHARTER, plan.ROADMAP, USAGE_LOG):
+    for path in (plan.CHARTER, plan.ROADMAP, USAGE_LOG, plan.LESSONS, plan.FOLLOWUPS):
         Path(path).unlink(missing_ok=True)
     logs = DATA / "logs"
     if logs.exists():

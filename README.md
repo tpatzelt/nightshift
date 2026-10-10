@@ -44,6 +44,30 @@ Charters name their projects in a `## Projects` line, and the dashboard clones a
 project from `~/coding` (mounted read-only at `/coding`) into a bare repo the first
 time it is needed. Nothing is ever written back to the working copies.
 
+## How a task is worked
+
+A worker (Sonnet) implements one task on its own branch. Deterministic gates check
+it: scope, diff size with lockfiles not counted, no weakened tests, no secrets,
+and the acceptance commands. A reviewer (Opus) then splits its findings into
+`blocking` defects and `nits`. Only a blocking defect, a failed review check or high
+risk stops a merge. Nits go to the planner as followups.
+
+A task gets two attempts, and the second continues the first instead of starting
+over. An unmerged attempt is pushed to `refs/nightshift/run-N/attempts/T-xxxx` in the
+bare repo, along with any uncommitted files inside `allowed_paths`. The retry starts
+from those commits, rebased onto `agent/integration`. Its TASK.md carries the
+reviewer's blocking list, the gate output and the worker's own
+`.nightshift/PROGRESS.md` handoff note. On the re-review, the reviewer checks its
+earlier blocking items first, and may block again only on new or serious defects.
+A parked task's commits stay at that ref, and the planner can start a re-issued task
+from them with `continue_from`.
+
+The planner also sees how much of their turn budget recent workers used, the
+followups that workers and reviewers left behind (`data/plan/followups.jsonl`), and
+its own `data/plan/LESSONS.md`. It keeps at most 15 rules distilled from findings
+that recurred, which workers read before each task and reviewers enforce. Both files
+are archived with the run.
+
 ## Operate
 
 ```bash

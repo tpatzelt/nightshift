@@ -124,6 +124,11 @@ def check_path(tool: str, raw_path: str) -> None:
     # `cat`, which this hook never sees.
     if tool == "Read" and rel == ".nightshift/TASK.md":
         allow(tool, str(resolved))
+    # The worker's handoff note. It is the one bookkeeping file the worker writes:
+    # an attempt that runs out of turns never reports, and the orchestrator copies
+    # this note into the next attempt's TASK.md. It is excluded from git.
+    if rel == ".nightshift/PROGRESS.md":
+        allow(tool, str(resolved))
     if rel.startswith(".nightshift"):
         block(tool, rel, ".nightshift is orchestrator bookkeeping, not task scope")
     allow(tool, str(resolved))

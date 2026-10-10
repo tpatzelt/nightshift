@@ -705,7 +705,8 @@ def record_usage(res: AgentResult, wall_sec: float, model: str) -> None:
         "ts": ts(), "role": res.role, "task": res.task_id, "model": model,
         "exit_code": res.exit_code, "is_error": res.is_error,
         "timed_out": res.timed_out, "rate_limited": res.rate_limited,
-        "num_turns": res.num_turns, "cost_usd": round(res.cost_usd, 6),
+        "num_turns": res.num_turns, "max_turns": res.max_turns,
+        "cost_usd": round(res.cost_usd, 6),
         "wall_sec": round(wall_sec, 1),
         "usage": res.result.get("usage", {}),
         "rate_limit": res.rate_limit_info,
@@ -863,6 +864,7 @@ def prepare_worktree(task: dict) -> Path:
     gates.git(work, "checkout", "-b", f"agent/{task['id']}")
     gates.git(work, "config", "user.name", "NIGHTSHIFT worker")
     gates.git(work, "config", "user.email", "nightshift@localhost")
+    carried = carry_forward(task, work)
 
     # Local-only excludes: the orchestrator's own bookkeeping directory and the
     # build artifacts that running the tests produces are not the agent's doing,
@@ -889,11 +891,108 @@ def prepare_worktree(task: dict) -> Path:
         + "".join(f"- `{p}`\n" for p in task["allowed_paths"])
         + f"\n## Paths you must not touch\n"
         + "".join(f"- `{p}`\n" for p in task["protected_paths"])
-        + f"\n## Limits\n- diff at most {task['max_diff_lines']} lines\n"
+        + f"\n## Limits\n- diff at most {task['max_diff_lines']} lines "
+        f"(lockfiles not counted)\n"
         f"- new tests required: {task.get('new_tests_required', True)}\n"
+        f"- budget: {task['max_turns']} turns and {task['timeout_min']} minutes; an "
+        f"attempt that runs out reports nothing, and only its files carry over\n"
         f"- attempt {task.get('attempts', 0) + 1} of 2\n"
-        f"\n## Notes from earlier attempts\n{notes}\n", encoding="utf-8")
+        + (f"\n## Starting point\n{carried}\n" if carried else "")
+        + f"\n## Notes from earlier attempts\n{notes}\n", encoding="utf-8")
     return work
+
+
+def attempt_ref(task_id: str) -> str:
+    """Where an unmerged attempt's commits are kept in the bare repo.
+
+    Outside refs/heads, so a run's branch list stays the integration branch and
+    tags. Task ids restart at T-0001 with each run, so the run number is part of
+    the ref: run 7's T-0001 must never pick up run 6's leftovers. The refs are
+    left in place when a run ends, next to its tag, so parked work can be fetched.
+    """
+    run_no = (runs.active_run() or {}).get("run_no", 0)
+    return f"refs/nightshift/run-{run_no}/attempts/{task_id}"
+
+
+def save_attempt(task: dict, work: Path) -> str | None:
+    """Keep an unmerged attempt so the retry can build on it.
+
+    Every retry used to start from a fresh clone. In run 6 only 12 of 31 second
+    attempts merged, and half the worker spend went to tasks that never merged:
+    a worker that hit the turn limit with the job mostly done, or that needed two
+    fixes from the reviewer, redid everything and often ran out again.
+    Uncommitted work is committed here too, so a turn limit loses nothing.
+    """
+    try:
+        if not work.exists():
+            return None
+        gates.git(work, "add", "-u")
+        # New files only inside the task's scope: build output the worker's
+        # .gitignore misses must not ride along into the next attempt's diff.
+        untracked = gates.git(work, "ls-files", "--others", "--exclude-standard").split("\n")
+        keep = [p for p in untracked if p and gates.path_allowed(p, task["allowed_paths"])]
+        if keep:
+            gates.git(work, "add", "--", *keep)
+        if gates.git(work, "diff", "--cached", "--name-only").strip():
+            gates.git(work, "commit", "-q", "--no-verify", "-m",
+                      f"{task['id']}: unfinished work saved by NIGHTSHIFT "
+                      f"at the end of attempt {task.get('attempts', 0) + 1}")
+        if gates.git(work, "rev-list", "--count", f"{INTEGRATION}..HEAD").strip() == "0":
+            return None
+        gates.git(work, "push", "-q", "-f", "origin", f"HEAD:{attempt_ref(task['id'])}")
+        return gates.git(work, "rev-parse", "--short", "HEAD").strip()
+    except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+        log(f"{task['id']} could not save its attempt: {exc}", level="WARN")
+        return None
+
+
+def read_handoff(work: Path, limit: int = 3000) -> str:
+    """The worker's own progress note, kept for the next attempt.
+
+    A worker that hits its turn limit never reaches its final JSON, so this file
+    is the only account of what it got done and what it meant to do next.
+    """
+    path = work / ".nightshift" / "PROGRESS.md"
+    try:
+        return clip(path.read_text(encoding="utf-8").strip(), limit) if path.exists() else ""
+    except OSError:
+        return ""
+
+
+def carry_forward(task: dict, work: Path) -> str:
+    """Put the task's saved attempt, or the one it continues, on its branch.
+
+    Returns a paragraph for TASK.md saying what the worker starts from, or ""
+    when it starts from the integration branch as before. Saved commits that no
+    longer rebase onto the integration branch are dropped, and the worker is told.
+    """
+    source = task.get("continue_from") or task["id"]
+    ref = attempt_ref(source)
+    try:
+        if not gates.git(work, "ls-remote", "origin", ref).strip():
+            if source == task["id"]:
+                return ""
+            return (f"{source} left no saved commits, so this branch starts from "
+                    f"`{INTEGRATION}`.")
+        gates.git(work, "fetch", "-q", "origin", f"+{ref}:refs/nightshift/previous")
+        gates.git(work, "reset", "-q", "--hard", "refs/nightshift/previous")
+        gates.git(work, "rebase", "-q", INTEGRATION, timeout=300)
+    except (RuntimeError, subprocess.SubprocessError) as exc:
+        gates.git(work, "rebase", "--abort", check=False)
+        gates.git(work, "reset", "-q", "--hard", INTEGRATION)
+        log(f"{task['id']} could not carry {source}'s attempt forward: {exc}", level="WARN")
+        return (f"{source}'s earlier commits no longer apply to `{INTEGRATION}`, so this "
+                f"branch starts clean. They are still at `{ref}` in the bare repo.")
+    carried = gates.git(work, "rev-list", "--count", f"{INTEGRATION}..HEAD").strip()
+    if carried == "0":
+        return ""
+    who = "your previous attempt" if source == task["id"] else source
+    log(f"{task['id']} continues from {who}: {carried} commit(s) carried forward")
+    return (f"This branch already holds {carried} commit(s) from {who}, rebased onto "
+            f"`{INTEGRATION}`. Start with `git log --stat {INTEGRATION}..HEAD` and the "
+            f"acceptance commands, then fix what the notes below say is wrong and keep "
+            f"what works. If the approach itself is wrong, run "
+            f"`git reset --hard {INTEGRATION}` and start over.")
 
 
 def sandbox_exec(task_id: str, work: Path, command: str, timeout_min: int,
@@ -1228,7 +1327,11 @@ def run_planner(state: dict, gov: "Governor | None" = None) -> bool:
     tasks = {t["id"]: t for t in plan.load_tasks()}
     parked = plan.load_tasks(plan.PARKED)
     done = plan.load_tasks(plan.DONE)[-15:]
-    followups = [f for e in read_usage()[-80:] for f in e.get("followups", [])]
+    # Followups used to be read from usage.jsonl, which never recorded them, so
+    # every planner run before this saw an empty list.
+    followups = [f"{f['task']} ({f['source']}): {f['text']}"
+                 for f in plan.recent_followups(40)]
+    lessons = plan.lessons_text()
 
     context = (
         f"# CHARTER\n{plan.charter_text()}\n\n"
@@ -1237,11 +1340,18 @@ def run_planner(state: dict, gov: "Governor | None" = None) -> bool:
         + "\n".join(f"- {t['id']} [{t['charter_goal']}/{t['roadmap_ref']}] {t['title']}"
                      for t in tasks.values())
         + f"\n\n# PARKED\n"
-        + "\n".join(f"- {t['id']} {t['title']} — {t.get('park_reason', 'no reason recorded')}"
+        + "\n".join(f"- {t['id']} {t['title']}"
+                     + (f" [saved commits {t['saved_attempt']}, usable as continue_from]"
+                        if t.get("saved_attempt") else "")
+                     + f" — {t.get('park_reason', 'no reason recorded')}"
                      for t in parked)
         + f"\n\n# RECENTLY DONE\n"
         + "\n".join(f"- {t['id']} {t['title']}" for t in done)
-        + f"\n\n# WORKER FOLLOWUPS\n" + "\n".join(f"- {f}" for f in followups[-40:])
+        + f"\n\n# FOLLOWUPS (ideas workers and reviewers left unimplemented)\n"
+        + "\n".join(f"- {f}" for f in followups)
+        + f"\n\n# WORKER BUDGET USE\n{budget_report(read_usage())}"
+        + f"\n\n# LESSONS (current list; send `lessons` to replace it)\n"
+        + (lessons or "(none yet)")
     )
     prompt = prompt_for("planner") + "\n\n" + context
 
@@ -1263,6 +1373,13 @@ def run_planner(state: dict, gov: "Governor | None" = None) -> bool:
     accepted = plan.validate_planner_output(payload, goals=goals, existing=tasks)
     applied = apply_planner_ops(accepted, tasks)
     plan.write_adr(payload["adr"], now().strftime("%Y%m%d-%H%M%S"))
+    try:
+        new_lessons = plan.validate_lessons(payload)
+        if new_lessons is not None:
+            plan.write_lessons(new_lessons)
+            log(f"planner set {len(new_lessons)} lesson(s)")
+    except plan.PlanError as exc:
+        log(f"planner lessons rejected: {exc}", level="WARN")
 
     rejected = payload.get("_rejected", [])
     state["last_planner_run"] = ts()
@@ -1278,6 +1395,33 @@ def run_planner(state: dict, gov: "Governor | None" = None) -> bool:
     if rejected:
         log("planner ops rejected: " + "; ".join(rejected[:5]), level="WARN")
     return applied > 0
+
+
+def budget_report(usage: list[dict], last: int = 20) -> str:
+    """How much of their turn budget recent workers used, for sizing new tasks.
+
+    Run 6 parked seven tasks on the turn limit or the timeout, three of them
+    twice over, and the planner had no way to see that from task titles.
+    """
+    workers = [e for e in usage if e.get("role") == "worker"][-last:]
+    if not workers:
+        return "(no worker runs yet)"
+    lines = []
+    for e in workers:
+        cap = e.get("max_turns") or 0
+        if e.get("timed_out"):
+            end = "timed out"
+        elif cap and e.get("num_turns", 0) > cap:
+            end = "hit the turn limit"
+        else:
+            end = "finished"
+        lines.append(f"- {e.get('task')}: {e.get('num_turns', 0)} turns"
+                     + (f" of {cap}" if cap else "")
+                     + f", {e.get('wall_sec', 0) / 60:.0f} min, "
+                       f"${e.get('cost_usd', 0):.2f}, {end}")
+    capped = sum(1 for ln in lines if not ln.endswith("finished"))
+    return (f"{capped} of the last {len(workers)} worker runs ran out of budget.\n"
+            + "\n".join(lines))
 
 
 def apply_planner_ops(ops: list[dict], tasks: dict[str, dict]) -> int:
@@ -1502,6 +1646,8 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
                     timeout_min=task["timeout_min"], max_turns=task["max_turns"],
                     protected=protected, project=task["project"])
     if res.rate_limited:
+        # Not an attempt either, so whatever it got done is carried into the rerun.
+        save_attempt(task, work)
         gov.on_limit(state, res)
         return "limited"
     if res.interrupted:
@@ -1514,6 +1660,8 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         return "interrupted"
 
     worker_json = extract_json_object(res.text) or {}
+    followups = worker_json.get("followups")
+    plan.append_followups(tid, "worker", followups if isinstance(followups, list) else [])
     gate = gates.run_gates(
         task, work, INTEGRATION, worker_json,
         lambda tid_, work_, cmd_, timeout_min: sandbox_exec(
@@ -1528,9 +1676,14 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
     review = None
     if gate.ok:
         diff = gates.git(work, "diff", f"{INTEGRATION}...HEAD")[:120000]
+        lessons = plan.lessons_text()
+        prior = task.get("prior_blocking") or []
         context = (f"# CHARTER\n{plan.charter_text()}\n\n"
-                   f"# TASK\n{json.dumps(task, indent=2)}\n\n"
-                   f"# GATES\n{gate.report()}\n{json.dumps(gate.details, indent=2)[:4000]}\n\n"
+                   + (f"# LESSONS\n{lessons}\n\n" if lessons else "")
+                   + f"# TASK\n{json.dumps(task, indent=2)}\n\n"
+                   + ("# YOUR BLOCKING ITEMS FROM THE PREVIOUS ATTEMPT\n"
+                      + "".join(f"- {b}\n" for b in prior) + "\n" if prior else "")
+                   + f"# GATES\n{gate.report()}\n{json.dumps(gate.details, indent=2)[:4000]}\n\n"
                    f"# WORKER SAID\n{json.dumps(worker_json, indent=2)}\n\n"
                    f"# DIFF\n```diff\n{diff}\n```")
         review, rres = agent_json("reviewer", tid, prompt_for("reviewer") + "\n\n" + context,
@@ -1542,6 +1695,7 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
             return "limited"
 
     if gate.ok and review and plan.review_passes(review):
+        plan.append_followups(tid, "reviewer", review.get("nits", []))
         sha = merge_task(task, work)
         plan.save_task({**task, "merged_sha": sha, "merged_at": ts()}, "done")
         state["merges_total"] = state.get("merges_total", 0) + 1
@@ -1561,10 +1715,20 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
         return "merged"
 
     # not merged: record why, so the next attempt starts better informed
-    reason = gate.report() if not gate.ok else (
-        f"reviewer said {review['verdict']}: {review['notes']}" if review
-        else "reviewer produced no usable JSON")
+    if not gate.ok:
+        reason = gate.report()
+    elif review:
+        reason = f"reviewer said {review['verdict']}: {review['notes']}"
+        if review.get("blocking"):
+            reason += "\nBlocking, fix all of these:\n" + "".join(
+                f"  {i}. {b}\n" for i, b in enumerate(review["blocking"], 1))
+    else:
+        reason = "reviewer produced no usable JSON"
     task = dict(task)
+    if review and review.get("blocking"):
+        task["prior_blocking"] = review["blocking"]
+    saved = save_attempt(task, work)
+    handoff = read_handoff(work)
     task["attempts"] = task.get("attempts", 0) + 1
     # Reviewer verdicts run 2-3k characters and list numbered fixes; a note cut at
     # 600 handed the retry only the first fix and parked the task over the rest.
@@ -1574,6 +1738,10 @@ def work_one_task(task: dict, state: dict, gov: Governor) -> str:
     if output:
         task["notes"].append(
             f"attempt {task['attempts']} gate output:\n{clip(output, 4000)}")
+    if handoff:
+        task["notes"].append(f"attempt {task['attempts']} handoff from the worker:\n{handoff}")
+    if saved:
+        task["saved_attempt"] = saved
 
     if task["attempts"] >= 2:
         # Only a terminal outcome counts against the streak. A retry is the loop

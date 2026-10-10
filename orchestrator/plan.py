@@ -7,6 +7,7 @@ validate that JSON and decide what the orchestrator is willing to apply.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import subprocess
@@ -23,6 +24,12 @@ BACKLOG = PLAN / "backlog"
 PARKED = PLAN / "parked"
 DONE = PLAN / "done"
 DECISIONS = PLAN / "decisions"
+# Rules the planner distils from repeated review findings and parks. Workers and
+# reviewers read it, so a mistake the reviewer has flagged twice stops recurring.
+LESSONS = PLAN / "LESSONS.md"
+# Ideas workers and reviewers did not act on. The planner reads the tail.
+FOLLOWUPS = PLAN / "followups.jsonl"
+MAX_LESSONS = 15
 
 STATUSES = {"ready", "in_progress", "parked", "done"}
 RISKS = {"low", "medium", "high"}
@@ -182,6 +189,8 @@ def validate_task(task: dict, *, goals: list[str] | None = None,
                         f"ceiling of {MAX_DIFF_LINES_CEILING}")
     if out["max_diff_lines"] < 1 or out["timeout_min"] < 1 or out["max_turns"] < 1:
         raise PlanError("max_diff_lines, timeout_min and max_turns must be positive")
+    if out.get("continue_from") is not None and not TASK_ID_RE.match(str(out["continue_from"])):
+        raise PlanError(f"continue_from '{out['continue_from']}' must look like T-0001")
     return out
 
 
@@ -340,11 +349,83 @@ def validate_reviewer_output(payload: dict) -> dict:
         raise PlanError(f"reviewer verdict must be one of {sorted(VERDICTS)}")
     if not str(payload.get("notes", "")).strip():
         raise PlanError("reviewer must give notes")
+    # A reviewer that leaves the field out entirely has not said its findings are
+    # minor, so its notes stand as the blocking list rather than being waved through.
+    if "blocking" not in payload and payload["verdict"] != "approve":
+        payload["blocking"] = [str(payload["notes"])]
+    for field in ("blocking", "nits"):
+        value = payload.get(field)
+        if value is None:
+            value = []
+        elif isinstance(value, str):
+            value = [value]
+        elif not isinstance(value, list):
+            raise PlanError(f"reviewer field '{field}' must be a list")
+        payload[field] = [str(v).strip() for v in value if str(v).strip()]
+    # Only a concrete defect may hold a merge back. Runs 4 and 6 each parked eight
+    # tasks on second-round "revise" verdicts, often over points the verdict
+    # itself called non-blocking. A revise that names no blocking defect is
+    # therefore an approval: the nits become followups for the planner instead
+    # of a third worker run. A false boolean still blocks through review_passes().
+    if payload["verdict"] == "revise" and not payload["blocking"]:
+        payload["verdict"] = "approve"
+        payload["normalised"] = "revise with no blocking items read as approve"
     return payload
 
 
 def review_passes(review: dict) -> bool:
     """The merge condition, kept in one place."""
-    return (review["verdict"] == "approve" and review["aligned"]
+    return (review["verdict"] == "approve" and not review.get("blocking")
+            and review["aligned"]
             and review["scope_ok"] and review["meets_acceptance_intent"]
             and review["tests_meaningful"] and review["risk"] != "high")
+
+
+# -------------------------------------------------------------------- lessons
+def validate_lessons(payload: dict) -> list[str] | None:
+    """The planner's replacement lesson list, or None when it sent none."""
+    lessons = payload.get("lessons")
+    if lessons is None:
+        return None
+    if not isinstance(lessons, list):
+        raise PlanError("lessons must be a list of strings")
+    out = [" ".join(str(item).split())[:400] for item in lessons if str(item).strip()]
+    return out[:MAX_LESSONS]
+
+
+def lessons_text() -> str:
+    return LESSONS.read_text(encoding="utf-8") if LESSONS.exists() else ""
+
+
+def write_lessons(lessons: list[str]) -> None:
+    LESSONS.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LESSONS.with_suffix(".md.tmp")
+    tmp.write_text("# Lessons from this run\n\n_Maintained by the NIGHTSHIFT planner "
+                   "from review findings and parked tasks._\n\n"
+                   + "".join(f"{i}. {item}\n" for i, item in enumerate(lessons, 1)),
+                   encoding="utf-8")
+    tmp.replace(LESSONS)
+
+
+# ------------------------------------------------------------------ followups
+def append_followups(task_id: str, source: str, items: list) -> int:
+    items = [" ".join(str(i).split())[:600] for i in (items or []) if str(i).strip()]
+    if not items:
+        return 0
+    FOLLOWUPS.parent.mkdir(parents=True, exist_ok=True)
+    with FOLLOWUPS.open("a", encoding="utf-8") as fh:
+        for item in items:
+            fh.write(json.dumps({"task": task_id, "source": source, "text": item}) + "\n")
+    return len(items)
+
+
+def recent_followups(limit: int = 40) -> list[dict]:
+    if not FOLLOWUPS.exists():
+        return []
+    out = []
+    for line in FOLLOWUPS.read_text(encoding="utf-8").splitlines()[-limit:]:
+        try:
+            out.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return out
