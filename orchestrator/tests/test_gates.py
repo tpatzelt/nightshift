@@ -238,5 +238,29 @@ check("lint output is kept too",
       "ruff check ." in gates.run_gates({**TASK, "lint_cmd": "ruff check ."}, r, BASE, DONE,
                                         fake_sandbox(1, "F401 unused import")).failing_output())
 
+print("\n--- lockfiles do not count toward the diff limit ---")
+r = make_repo(BASE_FILES)
+commit(r, {"src/app.py": "def add(a, b):\n    return a + b\n\nX = 1\n",
+           "tests/test_app.py": "def test_a():\n    assert 1 == 1\n",
+           "uv.lock": "".join(f"line {i}\n" for i in range(900)),
+           "web/package-lock.json": "{}\n"})
+locked = gates.run_gates({**TASK, "allowed_paths": ["src/**", "tests/**", "uv.lock", "web/**"]},
+                         r, BASE, DONE, fake_sandbox())
+expect("a 900-line uv.lock stays under a 400-line limit", locked, True)
+check("lockfile lines are reported separately",
+      locked.details.get("lockfile_lines") == 901, str(locked.details))
+check("code lines are still counted", 0 < locked.details["diff_lines"] < 20,
+      str(locked.details))
+commit(r, {}, remove=["uv.lock"], message="T-0001: drop the lock")
+dropped = gates.run_gates({**TASK, "allowed_paths": ["src/**", "tests/**", "uv.lock", "web/**"]},
+                          r, BASE, DONE, fake_sandbox())
+check("a lockfile deleted again drops out of the net diff",
+      dropped.details.get("lockfile_lines", 0) == 1, str(dropped.details))
+r = make_repo(BASE_FILES)
+commit(r, {"src/uv.lock.py": "".join(f"x{i} = {i}\n" for i in range(450)),
+           "tests/test_app.py": "def test_a():\n    assert 1 == 1\n"})
+expect("a source file named like a lockfile still counts",
+       gates.run_gates(TASK, r, BASE, DONE, fake_sandbox()), False, "diff is")
+
 print(f"\n{'ALL GATE TESTS PASSED' if not failures else 'FAILURES: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

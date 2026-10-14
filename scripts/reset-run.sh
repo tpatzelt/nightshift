@@ -46,7 +46,8 @@ fi
 targets=(
   "$DATA/work" "$DATA/logs" "$DATA/digests" "$DATA/backup" "$DATA/state"
   "$DATA/plan/backlog" "$DATA/plan/done" "$DATA/plan/parked" "$DATA/plan/decisions"
-  "$DATA/plan/CHARTER.md" "$DATA/plan/ROADMAP.md" "$DATA/STOP"
+  "$DATA/plan/CHARTER.md" "$DATA/plan/ROADMAP.md" "$DATA/plan/LESSONS.md"
+  "$DATA/plan/followups.jsonl" "$DATA/STOP"
 )
 [ "$repos" = 1 ] && targets+=("$DATA/repos")
 

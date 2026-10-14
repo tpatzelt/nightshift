@@ -205,5 +205,51 @@ merge_check("approve but tests not meaningful does not merge",
             {**GOOD, "tests_meaningful": False}, False)
 merge_check("revise does not merge", {**GOOD, "verdict": "revise"}, False)
 
+
+print("\n--- reviewer severity ---")
+v = plan.validate_reviewer_output
+merge_check("revise with only nits merges",
+            v({**GOOD, "verdict": "revise", "blocking": [], "nits": ["rename x"]}), True)
+merge_check("revise with a blocking item does not merge",
+            v({**GOOD, "verdict": "revise", "blocking": ["crash on empty input"]}), False)
+merge_check("legacy revise without a blocking field does not merge",
+            v({**GOOD, "verdict": "revise"}), False)
+merge_check("approve that still lists a blocking item does not merge",
+            v({**GOOD, "blocking": ["sql injection in q"]}), False)
+merge_check("nit-only revise with tests not meaningful does not merge",
+            v({**GOOD, "verdict": "revise", "blocking": [], "tests_meaningful": False}), False)
+merge_check("reject with no blocking items does not merge",
+            v({**GOOD, "verdict": "reject", "blocking": []}), False)
+check("blocking given as a string becomes a list",
+      lambda: v({**GOOD, "verdict": "revise", "blocking": "fix it"})["blocking"] == ["fix it"]
+      or (_ for _ in ()).throw(AssertionError("not normalised")))
+check("blocking of the wrong type rejected",
+      lambda: v({**GOOD, "blocking": {"a": 1}}), raises=True)
+
+print("\n--- lessons and followups ---")
+import tempfile  # noqa: E402
+tmp = Path(tempfile.mkdtemp(prefix="ns-plan-"))
+plan.LESSONS, plan.FOLLOWUPS = tmp / "LESSONS.md", tmp / "followups.jsonl"
+check("no lessons field keeps the list", lambda: plan.validate_lessons({}) is None
+      or (_ for _ in ()).throw(AssertionError("expected None")))
+check("lessons must be a list", lambda: plan.validate_lessons({"lessons": "x"}), raises=True)
+check("lessons are capped",
+      lambda: len(plan.validate_lessons({"lessons": [f"l{i}" for i in range(40)]}))
+      == plan.MAX_LESSONS or (_ for _ in ()).throw(AssertionError("not capped")))
+plan.write_lessons(["Justify each dependency.", "Spell lines as users do."])
+check("lessons are written as a numbered list",
+      lambda: "2. Spell lines as users do." in plan.lessons_text()
+      or (_ for _ in ()).throw(AssertionError(plan.lessons_text())))
+plan.append_followups("T-0001", "worker", ["cache the feed", "", "  "])
+plan.append_followups("T-0002", "reviewer", ["patch connect_ex too"])
+check("followups skip blanks and keep their source",
+      lambda: [(f["task"], f["source"]) for f in plan.recent_followups()]
+      == [("T-0001", "worker"), ("T-0002", "reviewer")]
+      or (_ for _ in ()).throw(AssertionError(plan.recent_followups())))
+check("continue_from must be a task id",
+      lambda: plan.validate_task(task(continue_from="the old one"), goals=GOALS), raises=True)
+check("continue_from with a task id accepted",
+      lambda: plan.validate_task(task(continue_from="T-0006"), goals=GOALS))
+
 print(f"\n{'ALL PLAN TESTS PASSED' if not failures else 'FAILURES: ' + ', '.join(failures)}")
 sys.exit(1 if failures else 0)

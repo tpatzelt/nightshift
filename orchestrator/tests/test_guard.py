@@ -29,6 +29,10 @@ CASES = [
     ("Edit", {"file_path": "/work/.nightshift/TASK.md"}, 2),
     ("Read", {"file_path": "/work/.nightshift/TASK.md"}, 0),  # the prompt says to read it
     ("Read", {"file_path": "/work/.nightshift/guard.log"}, 2),
+    ("Write", {"file_path": "/work/.nightshift/PROGRESS.md"}, 0),  # the handoff note
+    ("Edit", {"file_path": "/work/.nightshift/PROGRESS.md"}, 0),
+    ("Read", {"file_path": "/work/.nightshift/PROGRESS.md"}, 0),
+    ("Write", {"file_path": "/work/.nightshift/../.nightshift/guard.log"}, 2),
     ("Read", {"file_path": "/plan/CHARTER.md"}, 0),
     ("Read", {"file_path": "/work/src/foo.py"}, 0),
 ]

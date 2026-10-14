@@ -18,6 +18,18 @@ TEST_PATH_RE = re.compile(r"(^|/)(tests?|spec)/|(^|/)test_[^/]+\.py$|"
                           r"[^/]+_test\.(py|go|js|ts)$|\.(test|spec)\.(js|ts|tsx)$|"
                           r"(^|/)scripts/check-[^/]+\.sh$")
 
+# Files a package manager writes. A lockfile is part of the change, but its line
+# count measures the dependency tree, not the work: run 6's T-0001 failed its
+# 400-line limit at 506 lines on a scaffold whose uv.lock made up most of it.
+LOCKFILES = {"uv.lock", "poetry.lock", "Pipfile.lock", "package-lock.json",
+             "yarn.lock", "pnpm-lock.yaml", "bun.lock", "Cargo.lock", "go.sum",
+             "Gemfile.lock", "composer.lock"}
+
+
+def is_lockfile(path: str) -> bool:
+    return path.rsplit("/", 1)[-1] in LOCKFILES
+
+
 OR_TRUE = re.compile(r"^\+.*\|\|\s*true\b")
 
 # Ways a diff can make the suite lie about itself.
@@ -141,10 +153,20 @@ def run_gates(task: dict, work: Path, base: str, worker_json: dict | None,
 
     # 3. diff size
     diff = git(work, "diff", "--unified=3", f"{base}...HEAD")
-    changed_lines = sum(1 for ln in diff.splitlines()
-                        if (ln.startswith("+") or ln.startswith("-"))
-                        and not ln.startswith(("+++", "---")))
+    changed_lines = lock_lines = 0
+    current = ""
+    for ln in diff.splitlines():
+        if ln.startswith(("+++ ", "--- ")):
+            if ln[4:] != "/dev/null":      # a deleted file names itself on ---
+                current = ln[6:]           # strip "+++ b/" or "--- a/"
+        elif ln.startswith(("+", "-")):
+            if is_lockfile(current):
+                lock_lines += 1
+            else:
+                changed_lines += 1
     res.details["diff_lines"] = changed_lines
+    if lock_lines:
+        res.details["lockfile_lines"] = lock_lines
     if changed_lines > task["max_diff_lines"]:
         res.fail(f"diff is {changed_lines} lines, limit is {task['max_diff_lines']}")
 

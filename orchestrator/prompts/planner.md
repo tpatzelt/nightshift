@@ -29,13 +29,30 @@ so write them all, every time:
 | `timeout_min`, `max_turns` | the worker's budget, e.g. 45 and 60 |
 
 Optional: `depends_on` (task ids that must be done first), `new_tests_required`
-(default true), `notes` (a list of strings the worker reads before it starts).
+(default true), `notes` (a list of strings the worker reads before it starts), and
+`continue_from` (a parked task id: the new task starts from that task's saved commits
+instead of from scratch).
+
+Size every task so it fits comfortably in its budget. WORKER BUDGET USE shows how many
+turns recent workers needed. If similar tasks ran out of turns or time, split the work
+or raise the budget. When a task changes a rule, include the tests that pin the old rule
+in `allowed_paths`. When you re-issue a parked task, keep its useful work with
+`continue_from`, and narrow it to what its park reason says is still missing.
+
+Maintain `lessons`: at most 15 short, imperative rules for workers and reviewers on this
+run, drawn from findings that recurred. Use reviewer notes that repeat across tasks,
+parks with a common cause, and the followups. Workers read them before every task, and
+reviewers enforce them. Write a lesson only for a pattern you have seen at least twice,
+and phrase it as a concrete instruction, e.g. "Justify every new dependency in the body
+of the commit that adds it." Send the whole list each time you change it, or leave the
+field out to keep the current list.
 
 Output only:
 {"ops":[{"op":"add_task","task":{...}},{"op":"update_task","id":"T-0007","fields":{...}},
         {"op":"park_task","id":"T-0004","reason":"..."},
         {"op":"add_milestone","id":"M4","charter_goal":"G2","title":"...","exit_criteria":"..."},
         {"op":"reorder","ids":["T-0009","T-0008"]}],
+ "lessons":["..."],
  "adr":{"title":"...","context":"...","decision":"...","consequences":"..."}}
 
 Ops that break the rules above are rejected individually; the rest still apply.
